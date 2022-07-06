@@ -1,0 +1,1 @@
+static bool inc(char **buffer_p, char *packet_end, int bytes);
