@@ -64,6 +64,7 @@ void ArgParse(int argc,char *argv[]){
     loaded_config.dot_num = i;
 
     enable_cfDNS = raw_config.enable_cfDNS;
+    enable_mem_cache = raw_config.enable_mem_cache;
 }
 
 void preArgParse(int argc,char *argv[]){

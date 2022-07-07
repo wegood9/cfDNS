@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "protocol.h"
 
@@ -122,4 +123,34 @@ int ParseDomainName(char *packet_index, char *packet_start, int packet_size, cha
     bytes_read++; //.
 
     return bytes_read;
+}
+
+//移动指针并检查是否越界
+bool inc(char **buffer_p, char *packet_end, int bytes) {
+    *buffer_p += bytes;
+    return *buffer_p >= packet_end ? 0 : 1;
+}
+
+char *LookupType(const int type){
+    switch (type) {
+    case 1:
+        return "A";
+    case 28:
+        return "AAAA";
+    case 6:
+        return "SOA";
+    case 5:
+        return "CNAME";
+    case 15:
+        return "MX";
+    case 2:
+        return "NS";
+    case 12:
+        return "PTR";
+    case 16:
+        return "TXT";
+    default:
+        return "Unknown";
+        break;
+    }
 }

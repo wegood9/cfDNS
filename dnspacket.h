@@ -55,3 +55,31 @@ struct dns_response {
     char name[MAX_DOMAIN_LENGTH + 1]; // CNAME, MX, NS，TXT 等使用
     uint8_t authoritative; //权威响应
 };
+
+struct dns_request {
+    uint32_t src_ip_addr; //ipv4 地址
+    __uint128_t src_ip6_addr; //ipv6 地址
+    uint16_t id;
+    uint16_t q_type;
+    char name[MAX_DOMAIN_LENGTH + 1];
+};
+
+struct dns_rr_trailer_A
+{
+    uint16_t rr_domain_pointer;
+    uint16_t rr_type;
+    uint16_t rr_class;
+    uint32_t rr_ttl;
+    uint16_t rdata_length;
+    uint32_t ip_addr;
+};
+
+struct dns_rr_trailer_AAAA
+{
+    uint16_t rr_domain_pointer;
+    uint16_t rr_type;
+    uint16_t rr_class;
+    uint32_t rr_ttl;
+    uint16_t rdata_length;
+    __uint128_t ip6_addr;
+};

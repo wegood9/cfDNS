@@ -29,6 +29,7 @@ static struct config
 }loaded_config;
 
 extern bool enable_cfDNS;
+extern bool enable_mem_cache;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);

@@ -11,7 +11,7 @@
 
 #define MAX_AN_COUNT 50
 
-void *build_dns_request_packet(const char *domain_name, int *packet_size, 
+void *BuildDnsRequestPacket(const char *domain_name, int *packet_size, 
 			       int *request_id, int request_q_type) {
 
     struct dns_header *header;
@@ -37,7 +37,7 @@ void *build_dns_request_packet(const char *domain_name, int *packet_size,
     }
 
     //设置包头部分
-    *request_id = rand() % UINT16_MAX;
+    *request_id = request_id == NULL ? rand() % UINT16_MAX : *request_id;
     header = (struct dns_header *)buffer;
     memset(&header, 0, HEADER_SIZE);
     header->id = htons(*request_id);
@@ -62,7 +62,7 @@ void *build_dns_request_packet(const char *domain_name, int *packet_size,
             return NULL;
         }
 
-        //按字节复杂，对应网络序
+        //按字节复制，对应网络序
         *buffer++ = token_length;
         while ((*buffer++ = *token_index++) != 0);
 
@@ -324,10 +324,4 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
     }
 
     return responses;
-}
-
-//增加指针并检查是否越界
-bool inc(char **buffer_p, char *packet_end, int bytes) {
-    *buffer_p += bytes;
-    return *buffer_p >= packet_end ? 0 : 1;
 }
