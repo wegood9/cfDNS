@@ -1,29 +1,38 @@
 #include "server.h"
 
-void ProcessDnsQuery(void *received_packet_buffer, int received_packet_length){
+void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int received_packet_length){
     struct dns_request *query;
-    char *buffer;
-    int q_count,packet_length;
+    char *upstream_answer, *buffer;
+    int q_count, packet_length;
 
     query = ParseDnsQuery(received_packet_buffer, received_packet_length, &q_count);
 
     if (q_count == -1)
         //关闭socket，直接丢包
-        return; 
-    else if (!query)
-        //直接转发
         return;
+    //收到未知类型DNS请求，不处理直接转发
+    if (!query) {
+        upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+        free(received_packet_buffer);
+        if (!upstream_answer)
+            return; //上游无响应直接返回
+        else {
+            send(client_fd, upstream_answer, packet_length, 0);
+            free(upstream_answer);
+            return;
+        }
+    }
     else {
         char str[3];
         sprintf(str,"%d",query->q_type);
-        LOG(LOG_DBG, "Query %s, %s(%s)", query->name, str, LookupType(query->q_type));
+        LOG(LOG_INFO, "Query %s, %s(%s)", query->name, str, LookupType(query->q_type));
         switch (query->q_type) {
         case DNS_A_RECORD:
             if (inHosts(query->name)) {
-                buffer = BuildDnsRequestPacket(query->name, &packet_length, &query->id, DNS_A_RECORD);
-                SendBack(buffer);
+                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_A_RECORD, getHosts(query->name, 'A'), DEFAULT_TTL);
+                send(client_fd, buffer, packet_length, 0); //发回hosts对应的信息
             }
-            if (enable_mem_cache){
+            else if (enable_mem_cache){
                 if (isCached(query->name)) {
 
                 }
@@ -31,7 +40,7 @@ void ProcessDnsQuery(void *received_packet_buffer, int received_packet_length){
             break;
         case DNS_AAAA_RECORD:
             if (inHosts(query->name)){
-                buffer = BuildDnsRequestPacket(query->name, &packet_length, &query->id, DNS_AAAA_RECORD);
+                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_AAAA_RECORD, getHosts(query->name, 'B'), DEFAULT_TTL);
                 SendBack(buffer);
             }
             else if (isCached(query->name)) {}
@@ -147,8 +156,11 @@ void *BuildDnsResponsePacket(const char *domain_name,
         return NULL;
     }
 
-    answer_size = response_q_type == DNS_A_RECORD ? 
+    if (answer)
+        answer_size = response_q_type == DNS_A_RECORD ? 
                 sizeof(struct dns_rr_trailer_A) : sizeof(struct dns_rr_trailer_AAAA);
+    else
+        answer_size = 2 * sizeof(uint16_t) + 5 * sizeof(uint32_t); //SOA记录格式
     question_size = domain_length + sizeof(struct dns_query_trailer) + 2; //最前的1字节和最后的root
     total_size = answer_size + question_size + HEADER_SIZE;
     *packet_size = total_size;
@@ -163,10 +175,17 @@ void *BuildDnsResponsePacket(const char *domain_name,
     header = (struct dns_header *)buffer;
     memset(&header, 0, HEADER_SIZE);
     header->id = htons(request_id);
-    header->flags = htons(DNS_USE_RECURSION);
+    if (answer) {
+        header->flags = htons(DNS_RECURSION_AVAIL);
+        header->an_count = htons(1);
+        header->ns_count = htons(0);
+    }
+    else {
+        header->flags = htons(DNS_RECURSION_AVAIL | DNS_NAME_ERROR); //NXDOMAIN
+        header->an_count = htons(0);
+        header->ns_count = htons(1);
+    }
     header->qd_count = htons(1);
-    header->an_count = htons(0);
-    header->ns_count = htons(0);
     header->ar_count = htons(0);
 
     buffer += HEADER_SIZE;
@@ -194,12 +213,18 @@ void *BuildDnsResponsePacket(const char *domain_name,
 
     *buffer++ = 0; //最后一个字符是.
     q_trailer = (struct dns_query_trailer *)buffer;
-    q_trailer->q_type = htons(response_q_type);
+    if (answer)
+        q_trailer->q_type = htons(response_q_type);
+    else
+        q_trailer->q_type = htons(DNS_SOA_RECORD); //SOA记录
     q_trailer->q_class = htons(DNS_INET_ADDR);
 
     buffer += 2 * sizeof(uint16_t);
-
-    if (response_q_type == DNS_A_RECORD) {
+    
+    //资源记录区
+    if (!answer)
+        memset(buffer, 0, answer_size);
+    else if (response_q_type == DNS_A_RECORD) {
         struct dns_rr_trailer_A *rr_trailer = (struct dns_rr_trailer_A *)buffer;
         rr_trailer->rr_class = htons(DNS_INET_ADDR);
         rr_trailer->rr_type = htons(DNS_A_RECORD);

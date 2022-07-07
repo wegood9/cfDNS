@@ -5,6 +5,8 @@
 
 #include "dnspacket.h"
 
+#define DEFAULT_TTL 3600
+
 bool cidr_match(const struct in_addr *addr, const struct in_addr *net, uint8_t bits);
 bool is_valid_ipv6(const char *ip);
 bool is_valid_ipv4(const char *ip);

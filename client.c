@@ -4,10 +4,13 @@
 #include<string.h>
 #include<netinet/in.h>
 #include<stdint.h>
+#include<errno.h>
 
 #include "debug.h"
 #include "dnspacket.h"
 #include "protocol.h"
+#include "config.h"
+#include "socket.h"
 
 #define MAX_AN_COUNT 50
 
@@ -324,4 +327,46 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
     }
 
     return responses;
+}
+
+char *SendDnsRequest(char *query, int length, int *recv_length) {
+    uint8_t server_num = loaded_config.udp_num + loaded_config.tcp_num + loaded_config.doh_num + loaded_config.dot_num;
+    uint8_t chosen_server = rand() % server_num;
+    int sockfd = 0;
+    char *buffer;
+
+    chosen_server -= loaded_config.udp_num;
+    if (chosen_server <= 0) {
+        chosen_server += loaded_config.udp_num;
+        if (sockfd = socket(AF_INET, SOCK_DGRAM, 0) < 0 && 
+                connect_with_timeout(sockfd, 
+                                     (struct sockaddr*)&loaded_config.udp_server[chosen_server], 
+                                     sizeof(struct sockaddr), 
+                                     GLOBAL_TIMEOUT)
+                                     < 0) {
+            LOG(LOG_ERR, "Failed to create socket for recursive query: %s\n", strerror(errno));
+            close(sockfd);
+            return NULL;
+        }
+
+        if(send(sockfd, query, length, 0) < 0) {
+            LOG(LOG_ERR, "Failed to send query: %s\n", strerror(errno));
+            close(sockfd);
+            return NULL;
+        }
+
+        buffer = malloc(513 * sizeof(uint8_t));
+        *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)&loaded_config.udp_server[chosen_server], sizeof(struct sockaddr));
+        if (*recv_length < 20) {
+            LOG(LOG_WARN, "Failed to receive answer\n");
+            close(sockfd);
+            free(buffer);
+            return NULL;
+        }
+        else {
+            buffer[*recv_length] = 0;
+            close(sockfd);
+            return buffer;
+        }
+    }
 }
