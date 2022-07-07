@@ -33,28 +33,25 @@
 
 
 struct dns_header {
-  uint16_t id;
-  uint16_t flags;
-  uint16_t qd_count; //问题计数
-  uint16_t an_count; //直接回答计数
-  uint16_t ns_count; //权威计数
-  uint16_t ar_count; //额外信息计数
+    uint16_t id;
+    uint16_t flags;
+    uint16_t qd_count; //问题计数
+    uint16_t an_count; //直接回答计数
+    uint16_t ns_count; //权威计数
+    uint16_t ar_count; //额外信息计数
 };
 
 struct dns_query_trailer {
-  uint16_t q_type;
-  uint16_t q_class;
+    uint16_t q_type;
+    uint16_t q_class;
 };
 
-/* Stores information from the response packet sent from the DNS server. 
-   Only some of the fields will contain valid data, depending on the type
-   of response from the response_type field. */
 struct dns_response {
-  uint16_t response_type; /* Either A, CNAME, MX, or NS. */
-  uint16_t preference; /* MX only. */
-  uint32_t cache_time; /* All. */
-  uint32_t ip_addr; /* A only. */
-  __uint128_t ip6_addr; /* AAAA only. */
-  char name[MAX_DOMAIN_LENGTH + 1]; /* CNAME, MX, and NS only. */
-  uint8_t authoritative; /* All. 0 false, 1 true. */
+    uint16_t response_type;
+    uint16_t preference; //MX 记录
+    uint32_t cache_time; //ttl
+    uint32_t ip_addr; //ipv4 地址
+    __uint128_t ip6_addr; //ipv6 地址
+    char name[MAX_DOMAIN_LENGTH + 1]; // CNAME, MX, NS，TXT 等使用
+    uint8_t authoritative; //权威响应
 };

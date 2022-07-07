@@ -62,7 +62,7 @@ int ParseDomainName(char *packet_index, char *packet_start, int packet_size, cha
     uint16_t offset;
     char *packet_end = packet_start + packet_size;
 
-    /* The domain name is stored as a series of sub-domains or pointers to
+        /* The domain name is stored as a series of sub-domains or pointers to
          sub-domains. Each sub-domain contains the length as the first byte, 
          followed by LENGTH number of bytes (no null-terminator). If it's a pointer,
          the first two bits of the length byte will be set, and then the rest of
