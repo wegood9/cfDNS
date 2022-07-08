@@ -26,7 +26,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
     else {
         char str[3];
         sprintf(str,"%d",query->q_type);
-        LOG(LOG_INFO, "Query %s, %s(%s)", query->name, str, LookupType(query->q_type));
+        LOG(LOG_INFO, "Query %s, %s(%s)\n", query->name, str, LookupType(query->q_type));
         switch (query->q_type) {
         case DNS_A_RECORD:
             if (inHosts(query->name)) {
@@ -107,9 +107,10 @@ struct dns_request *ParseDnsQuery(void *packet_buffer, int packet_length, int *q
     }
 
     //非递归查询，直接转发
-    if (!(header.flags & DNS_USE_RECURSION)) 
+    if (!(header.flags & DNS_USE_RECURSION)) {
         LOG(LOG_INFO, "Receiving a non recursive query\n");
         return NULL; //！转发
+    }
 
     //无有效查询，或查询数非1
     if (header.qd_count != 1) { 
