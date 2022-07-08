@@ -33,7 +33,7 @@ extern bool enable_mem_cache;
 extern unsigned char debug_level;
 extern struct _raw_config raw_config;
 extern struct config loaded_config;
-extern const int n_size;
+
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);

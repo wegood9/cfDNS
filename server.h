@@ -17,3 +17,7 @@ void *BuildDnsResponsePacket(const char *domain_name,
                              const int response_q_type, 
                              const void *answer, 
                              const int ttl);
+void ProcessDnsQuery(const int client_fd, 
+                     const struct sockaddr *client_addr, 
+                     void *received_packet_buffer, 
+                     int received_packet_length);

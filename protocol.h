@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "dnspacket.h"
+#include "socket.h"
 
 #define DEFAULT_TTL 3600
 

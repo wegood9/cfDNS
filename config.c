@@ -17,7 +17,7 @@ struct config loaded_config;
 bool enable_cfDNS;
 bool enable_mem_cache;
 unsigned char debug_level;
-const int n_size = sizeof(struct sockaddr);
+
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);

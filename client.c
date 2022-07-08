@@ -329,17 +329,18 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
 }
 
 char *SendDnsRequest(char *query, int length, int *recv_length) {
-    uint8_t server_num = loaded_config.udp_num + loaded_config.tcp_num + loaded_config.doh_num + loaded_config.dot_num;
-    uint8_t chosen_server = rand() % server_num;
+    char server_num = loaded_config.udp_num + loaded_config.tcp_num + loaded_config.doh_num + loaded_config.dot_num;
+    char chosen_server = rand() % server_num;
     int sockfd = 0;
     char *buffer;
+    int n_size = sizeof(struct sockaddr);
 
     chosen_server -= loaded_config.udp_num;
     if (chosen_server <= 0) {
         chosen_server += loaded_config.udp_num;
-        if (sockfd = socket((struct sockaddr_storage*)&loaded_config.udp_server[chosen_server]->ss_family, SOCK_DGRAM, 0) < 0 && 
+        if ((sockfd = socket(loaded_config.udp_server[chosen_server]->ss_family, SOCK_DGRAM, 0)) < 0 &&
                 connect_with_timeout(sockfd, 
-                                     (struct sockaddr*)&loaded_config.udp_server[chosen_server], 
+                                     (struct sockaddr*)loaded_config.udp_server[chosen_server], 
                                      sizeof(struct sockaddr), 
                                      GLOBAL_TIMEOUT)
                                      < 0) {
@@ -348,14 +349,14 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             return NULL;
         }
 
-        if(sendto(sockfd, query, length, 0, (struct sockaddr*)&loaded_config.udp_server[chosen_server], sizeof(struct sockaddr)) < 0) {
-            LOG(LOG_ERR, "Failed to send query: %s\n", strerror(errno));
+        if(sendto(sockfd, query, length, 0, loaded_config.udp_server[chosen_server], n_size) < 0) {
+            LOG(LOG_ERR, "Failed to query upstream: %s\n", strerror(errno));
             close(sockfd);
             return NULL;
         }
 
         buffer = malloc(513 * sizeof(uint8_t));
-        *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)&loaded_config.udp_server[chosen_server], sizeof(struct sockaddr));
+        *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
         if (*recv_length < 20) {
             LOG(LOG_WARN, "Failed to receive answer\n");
             close(sockfd);
