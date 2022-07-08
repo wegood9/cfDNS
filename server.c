@@ -1,6 +1,6 @@
 #include "server.h"
 
-void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int received_packet_length){
+void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , void *received_packet_buffer, int received_packet_length){
     struct dns_request *query;
     char *upstream_answer, *buffer;
     int q_count, packet_length;
@@ -17,7 +17,7 @@ void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int rece
         if (!upstream_answer)
             return; //上游无响应直接返回
         else {
-            if (send(client_fd, upstream_answer, packet_length, 0) < 0)
+            if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, &n_size) < 0)
                 LOG(LOG_ERR, "Failed to send response\n");
             free(upstream_answer);
         }
@@ -31,7 +31,7 @@ void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int rece
             if (inHosts(query->name)) {
                 buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_A_RECORD, GetHostsEntry(query->name, 'A'), DEFAULT_TTL);
                 LOG(LOG_DBG, "Hit hosts entry: %s\n", query->name);
-                if (send(client_fd, buffer, packet_length, 0)) //发回hosts对应的信息
+                if (sendto(client_fd, buffer, packet_length, 0, client_addr, &n_size) < 0) //发回hosts对应的信息
                     LOG(LOG_ERR, "Failed to send response\n");
             }
             else if (enable_mem_cache){
@@ -44,7 +44,7 @@ void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int rece
             if (inHosts(query->name)){
                 buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_AAAA_RECORD, GetHostsEntry(query->name, 'B'), DEFAULT_TTL);
                 LOG(LOG_DBG, "Hit hosts entry: %s\n", query->name);
-                if (send(client_fd, buffer, packet_length, 0)) //发回hosts对应的信息
+                if (sendto(client_fd, buffer, packet_length, 0, client_addr, &n_size) < 0) //发回hosts对应的信息
                     LOG(LOG_ERR, "Failed to send response\n");
             }
             else if (isCached(query->name)) {

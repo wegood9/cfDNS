@@ -22,9 +22,9 @@ struct _raw_config
 
 struct config
 {
-    struct sockaddr_in *listen;
-    struct sockaddr_in *udp_server[8];
-    struct sockaddr_in *tcp_server[8];
+    struct sockaddr_storage *listen;
+    struct sockaddr_storage *udp_server[8];
+    struct sockaddr_storage *tcp_server[8];
     short udp_num,tcp_num,dot_num,doh_num;
 };
 
@@ -33,6 +33,7 @@ extern bool enable_mem_cache;
 extern unsigned char debug_level;
 extern struct _raw_config raw_config;
 extern struct config loaded_config;
+extern const int n_size;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);

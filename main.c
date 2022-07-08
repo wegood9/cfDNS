@@ -8,10 +8,12 @@
 
 int main(int argc, char *argv[]){
     ArgParse(argc,argv);
-    int listenfd, connfd = 0, n;
+    int listenfd, n;
     char *buffer;
+    struct sockaddr client_sockaddr;
+    
 
-    if ((listenfd = socket(AF_INET, SOCK_DGRAM, 0)) != -1 && 
+    if ((listenfd = socket((struct sockaddr_storage*)loaded_config.listen->ss_family, SOCK_DGRAM, 0)) != -1 && 
         bind(listenfd, (struct sockaddr*)loaded_config.listen, sizeof(struct sockaddr)) != -1)
         LOG(LOG_WARN, "Server is listening on UDP port %d at %s", raw_config.bind_port, raw_config.bind_ip);
     else {
@@ -19,11 +21,13 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
     while (1) {
-        buffer = malloc(513*sizeof(u_int8_t));
-        n = recvfrom(connfd, buffer, 512, 0, (struct sockaddr*)loaded_config.listen, sizeof(struct sockaddr));
+        buffer = malloc(513 * sizeof(u_int8_t));
+
+        n = recvfrom(listenfd, buffer, 512, 0, &client_sockaddr, &n_size);
         buffer[n] = '\0';
-        ProcessDnsQuery(connfd, buffer, n);
-        close(connfd);
+        ProcessDnsQuery(listenfd, &client_sockaddr, buffer, n);
+        
     }
+    close(listenfd);
     return 0;
 }

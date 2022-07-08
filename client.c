@@ -337,7 +337,7 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
     chosen_server -= loaded_config.udp_num;
     if (chosen_server <= 0) {
         chosen_server += loaded_config.udp_num;
-        if (sockfd = socket(AF_INET, SOCK_DGRAM, 0) < 0 && 
+        if (sockfd = socket((struct sockaddr_storage*)&loaded_config.udp_server[chosen_server]->ss_family, SOCK_DGRAM, 0) < 0 && 
                 connect_with_timeout(sockfd, 
                                      (struct sockaddr*)&loaded_config.udp_server[chosen_server], 
                                      sizeof(struct sockaddr), 
