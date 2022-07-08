@@ -249,8 +249,8 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
         }
 
         responses[i].cache_time = ntohl(*(uint32_t *)buffer_index);
-        if (ttl_multipler)
-            responses[i].cache_time *= ttl_multipler;
+        if (ttl_multiplier)
+            responses[i].cache_time *= ttl_multiplier;
         if (!inc(&buffer_index, packet_end, sizeof(uint32_t))) {
             free(responses);
             LOG(LOG_INFO, "Receiving an invalid response\n");

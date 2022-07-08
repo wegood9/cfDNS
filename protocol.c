@@ -5,6 +5,7 @@
 
 #include "protocol.h"
 
+
 bool cidr_match(const struct in_addr *addr, const struct in_addr *net, uint8_t bits) {
     if (bits == 0)
     // C99 6.5.7 (3): u32 << 32 is undefined behaviour
@@ -40,6 +41,7 @@ bool cidr6_match(const struct in6_addr *address, const struct in6_addr *network,
 bool isValidIPv6(const char *ip)
 {
     struct sockaddr_in6 addr;
+
     if (!ip || inet_pton(AF_INET6, ip, &addr.sin6_addr) != 1)
                 return false;
         else
@@ -154,3 +156,7 @@ char *LookupType(const int type){
         break;
     }
 }
+
+
+int isCached(){};
+int GetCacheEntry(){};

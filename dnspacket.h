@@ -64,6 +64,7 @@ struct dns_request {
     char name[MAX_DOMAIN_LENGTH + 1];
 };
 
+//考虑数据对齐，以下结果不能直接使用
 struct dns_rr_trailer_A
 {
     uint16_t rr_domain_pointer;

@@ -5,6 +5,8 @@
 
 #include "debug.h"
 #include "server.h"
+#include "hosts.h"
+
 
 int main(int argc, char *argv[]){
     ArgParse(argc,argv);
@@ -12,6 +14,12 @@ int main(int argc, char *argv[]){
     char *buffer;
     struct sockaddr client_sockaddr;
     int n_size = sizeof(struct sockaddr);
+
+    hosts_trie = InitHosts(raw_config.hosts);
+    if (!hosts_trie)
+        LOG(LOG_WARN, "Failed to load hosts: %s\n", strerror(errno));
+    else
+        LOG(LOG_INFO, "hosts loaded\n");
 
     if ((listenfd = socket((struct sockaddr_storage*)loaded_config.listen->ss_family, SOCK_DGRAM, 0)) != -1 && 
         bind(listenfd, (struct sockaddr*)loaded_config.listen, sizeof(struct sockaddr)) != -1)

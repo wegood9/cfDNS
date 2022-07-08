@@ -14,11 +14,11 @@
 
 struct _raw_config raw_config;
 struct config loaded_config;
-bool enable_cfDNS;
-bool enable_mem_cache;
-unsigned char debug_level;
-unsigned char ttl_multipler;
-
+bool enable_cfDNS = 0;
+bool enable_mem_cache = 0;
+unsigned char debug_level = 0;
+unsigned char ttl_multiplier = 0;
+struct trieNode *hosts_trie = NULL;
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
@@ -106,7 +106,7 @@ void ArgParse(int argc,char *argv[]){
         i++;
     loaded_config.dot_num = i;
 
-    ttl_multipler = raw_config.ttl_multipler;
+    ttl_multiplier = raw_config.ttl_multiplier;
     enable_cfDNS = raw_config.enable_cfDNS;
     enable_mem_cache = raw_config.enable_mem_cache;
     debug_level = raw_config.debug_level;
@@ -137,7 +137,7 @@ void preArgParse(int argc,char *argv[]){
     raw_config.hosts = fopen(ReadLine(fp, "hosts_file", tmp), "r");
     raw_config.enable_AAAA = ReadLine(fp, "enable_AAAA", tmp)[0] - 48;
     raw_config.enable_mem_cache = ReadLine(fp, "enable_mem_cache", tmp)[0] - 48;
-    raw_config.ttl_multipler = atoi(ReadLine(fp, "ttl_multipler", tmp));
+    raw_config.ttl_multiplier = atoi(ReadLine(fp, "ttl_multiplier", tmp));
     raw_config.debug_level = ReadLine(fp, "debug", tmp)[0] - 48;
 
     char *token_index=strtok(ReadLine(fp, "UDP_server", tmp), ", ");
@@ -199,7 +199,9 @@ char *ReadLine(FILE *fp, char str[], char *readin){
         if (readin[0] == '#' || readin[0] == '\n')
             continue;
         if (!strncmp(readin, str, strlen(str))){
-            readin[strlen(readin) - 1] = 0;
+            if (readin[strlen(readin) - 1] == '\n')
+                readin[strlen(readin) - 1] = 0; //去掉换行
+
             for (int i = 0; i < strlen(readin); i++)
                 if (readin[i] == ' ')
                     return readin+i+1;

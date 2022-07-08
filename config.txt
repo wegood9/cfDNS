@@ -1,14 +1,15 @@
 #测试
-bind_ip 127.0.0.1
-bind_port 53
-UDP_server 1.1.1.1:53,1.0.0.1:53, 8.8.8.8:53
-TCP_server 1.1.1.1:33, 8.8.8.8:22
-DoH_server "https://1.1.1.1" "https://4.4.4.4"
-DoT_server "tls://1.1.1.1"
+bind_ip 10.1.0.100
+bind_port 6553
+UDP_server 1.1.1.1:6553,1.0.0.1:53, 8.8.8.8:53
+TCP_server 
+DoH_server 
+DoT_server 
 debug 10
-hosts_file /etc/hosts
+hosts_file hosts
 enable_AAAA 1
 enable_mem_cache 0
+ttl_multiplier 1
 #test
 
 enable_cfDNS 0

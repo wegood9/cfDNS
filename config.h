@@ -1,8 +1,8 @@
-#include<sys/types.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
-#include<stdbool.h>
-#include<stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 struct _raw_config
 {
@@ -16,7 +16,7 @@ struct _raw_config
     unsigned bind_port;
     unsigned char debug_level;
     unsigned char cf_IP_version;
-    unsigned char ttl_multipler;
+    unsigned char ttl_multiplier;
     char cf_IP[16][41];
     bool enable_AAAA,enable_mem_cache,enable_cfDNS;
 };
@@ -34,7 +34,8 @@ extern bool enable_mem_cache;
 extern unsigned char debug_level;
 extern struct _raw_config raw_config;
 extern struct config loaded_config;
-extern unsigned char ttl_multipler;
+extern unsigned char ttl_multiplier;
+extern struct trieNode *hosts_trie;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);
