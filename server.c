@@ -56,8 +56,10 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
             //直接转发
             upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
             free(received_packet_buffer);
-            if (!upstream_answer)
+            if (!upstream_answer) {
+                LOG(LOG_WARN, "Upstream did not respond\n");
                 return; //上游无响应直接返回
+            }
             else {
                 if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
                     LOG(LOG_ERR, "Failed to send response\n");

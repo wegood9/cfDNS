@@ -1,10 +1,11 @@
-#include<stdbool.h>
-#include<stdlib.h>
-#include<stdio.h>
-#include<string.h>
-#include<netinet/in.h>
-#include<stdint.h>
-#include<errno.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <stdint.h>
+#include <errno.h>
+#include <poll.h>
 
 #include "debug.h"
 #include "protocol.h"
@@ -335,6 +336,11 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
     char *buffer;
     int n_size = sizeof(struct sockaddr);
 
+    struct pollfd fd;
+    int res;
+
+    fd.events = POLLIN;
+
     chosen_server -= loaded_config.udp_num;
     if (chosen_server <= 0) {
         chosen_server += loaded_config.udp_num;
@@ -356,9 +362,13 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
         }
 
         buffer = malloc(513 * sizeof(uint8_t));
-        *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
+        *recv_length = 0;
+        fd.fd = sockfd;
+        res = poll(&fd, 1, GLOBAL_TIMEOUT); // 1000 ms timeout
+        if (res > 0)
+            *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
         if (*recv_length < 20) {
-            LOG(LOG_WARN, "Failed to receive answer\n");
+            LOG(LOG_WARN, "Failed to receive answer from %s\n", raw_config.UDP_server[chosen_server]);
             close(sockfd);
             free(buffer);
             return NULL;
