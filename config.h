@@ -16,6 +16,7 @@ struct _raw_config
     unsigned bind_port;
     unsigned char debug_level;
     unsigned char cf_IP_version;
+    unsigned char ttl_multipler;
     char cf_IP[16][41];
     bool enable_AAAA,enable_mem_cache,enable_cfDNS;
 };
@@ -33,7 +34,7 @@ extern bool enable_mem_cache;
 extern unsigned char debug_level;
 extern struct _raw_config raw_config;
 extern struct config loaded_config;
-
+extern unsigned char ttl_multipler;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);

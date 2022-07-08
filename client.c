@@ -249,6 +249,8 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
         }
 
         responses[i].cache_time = ntohl(*(uint32_t *)buffer_index);
+        if (ttl_multipler)
+            responses[i].cache_time *= ttl_multipler;
         if (!inc(&buffer_index, packet_end, sizeof(uint32_t))) {
             free(responses);
             LOG(LOG_INFO, "Receiving an invalid response\n");
@@ -363,8 +365,10 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
 
         buffer = malloc(513 * sizeof(uint8_t));
         *recv_length = 0;
+
+        //使用poll的超时机制
         fd.fd = sockfd;
-        res = poll(&fd, 1, GLOBAL_TIMEOUT); // 1000 ms timeout
+        res = poll(&fd, 1, GLOBAL_TIMEOUT);
         if (res > 0)
             *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
         if (*recv_length < 20) {
