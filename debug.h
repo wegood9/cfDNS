@@ -6,16 +6,16 @@
 
 #define LOG(level, ...) do {  \
                             if (level == LOG_FATAL) { \
-                                fprintf(stderr, "\033[40;37mFATAL ERROR: \033[0m"); \
+                                fprintf(stderr, "\033[41;37mFATAL:\033[0m "); \
                                 fprintf(stderr, __VA_ARGS__); \
                             } \
                             else if (level >= debug_level) { \
                                 if (level == LOG_ERR) { \
-                                    fprintf(stderr, "\033[31mERROR: \033[0m"); \
+                                    fprintf(stderr, "\033[31mERROR:\033[0m "); \
                                     fprintf(stderr, __VA_ARGS__); \
                                 } \
                                 else if (level == LOG_WARN) { \
-                                    fprintf(stderr, "\033[33mWARNING: \033[0m"); \
+                                    fprintf(stderr, "\033[33mWARNING:\033[0m "); \
                                     fprintf(stderr, __VA_ARGS__); \
                                 } \
                                 else if (level == LOG_INFO) { \
@@ -28,5 +28,3 @@
                                 fflush(stderr); \
                             } \
                         } while (0)
-
-extern unsigned char debug_level;

@@ -4,7 +4,7 @@
 #include<stdbool.h>
 #include<stdio.h>
 
-static struct _raw_config
+struct _raw_config
 {
     char bind_ip[41];
     char UDP_server[8][41];
@@ -18,18 +18,21 @@ static struct _raw_config
     unsigned char cf_IP_version;
     char cf_IP[16][41];
     bool enable_AAAA,enable_mem_cache,enable_cfDNS;
-}raw_config;
+};
 
-static struct config
+struct config
 {
     struct sockaddr_in *listen;
     struct sockaddr_in *udp_server[8];
     struct sockaddr_in *tcp_server[8];
     short udp_num,tcp_num,dot_num,doh_num;
-}loaded_config;
+};
 
 extern bool enable_cfDNS;
 extern bool enable_mem_cache;
+extern unsigned char debug_level;
+extern struct _raw_config raw_config;
+extern struct config loaded_config;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);

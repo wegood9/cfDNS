@@ -7,7 +7,6 @@
 #include<errno.h>
 
 #include "debug.h"
-#include "dnspacket.h"
 #include "protocol.h"
 #include "config.h"
 #include "socket.h"
@@ -349,7 +348,7 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             return NULL;
         }
 
-        if(send(sockfd, query, length, 0) < 0) {
+        if(sendto(sockfd, query, length, 0, (struct sockaddr*)&loaded_config.udp_server[chosen_server], sizeof(struct sockaddr)) < 0) {
             LOG(LOG_ERR, "Failed to send query: %s\n", strerror(errno));
             close(sockfd);
             return NULL;

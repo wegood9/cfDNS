@@ -37,7 +37,7 @@ bool cidr6_match(const struct in6_addr *address, const struct in6_addr *network,
     return true;
 }
 
-bool is_valid_ipv6(const char *ip)
+bool isValidIPv6(const char *ip)
 {
     struct sockaddr_in6 addr;
     if (!ip || inet_pton(AF_INET6, ip, &addr.sin6_addr) != 1)
@@ -46,7 +46,7 @@ bool is_valid_ipv6(const char *ip)
             return true;
 }
 
-bool is_valid_ipv4(const char *ip)
+bool isValidIPv4(const char *ip)
 {
     struct sockaddr_in addr;
     

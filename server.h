@@ -5,7 +5,6 @@
 #include<netinet/in.h>
 #include<stdint.h>
 
-#include "dnspacket.h"
 #include "debug.h"
 #include "protocol.h"
 #include "config.h"

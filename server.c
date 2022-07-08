@@ -17,9 +17,9 @@ void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int rece
         if (!upstream_answer)
             return; //上游无响应直接返回
         else {
-            send(client_fd, upstream_answer, packet_length, 0);
+            if (send(client_fd, upstream_answer, packet_length, 0) < 0)
+                LOG(LOG_ERR, "Failed to send response\n");
             free(upstream_answer);
-            return;
         }
     }
     else {
@@ -29,21 +29,39 @@ void ProcessDnsQuery(const int client_fd, void *received_packet_buffer, int rece
         switch (query->q_type) {
         case DNS_A_RECORD:
             if (inHosts(query->name)) {
-                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_A_RECORD, getHosts(query->name, 'A'), DEFAULT_TTL);
-                send(client_fd, buffer, packet_length, 0); //发回hosts对应的信息
+                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_A_RECORD, GetHostsEntry(query->name, 'A'), DEFAULT_TTL);
+                LOG(LOG_DBG, "Hit hosts entry: %s\n", query->name);
+                if (send(client_fd, buffer, packet_length, 0)) //发回hosts对应的信息
+                    LOG(LOG_ERR, "Failed to send response\n");
             }
             else if (enable_mem_cache){
                 if (isCached(query->name)) {
-
+                    buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_A_RECORD, GetCacheEntry(query->name, 'A'), DEFAULT_TTL);
                 }
             }
             break;
         case DNS_AAAA_RECORD:
             if (inHosts(query->name)){
-                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_AAAA_RECORD, getHosts(query->name, 'B'), DEFAULT_TTL);
-                SendBack(buffer);
+                buffer = BuildDnsResponsePacket(query->name, &packet_length, &query->id, DNS_AAAA_RECORD, GetHostsEntry(query->name, 'B'), DEFAULT_TTL);
+                LOG(LOG_DBG, "Hit hosts entry: %s\n", query->name);
+                if (send(client_fd, buffer, packet_length, 0)) //发回hosts对应的信息
+                    LOG(LOG_ERR, "Failed to send response\n");
             }
-            else if (isCached(query->name)) {}
+            else if (isCached(query->name)) {
+
+            }
+            break;
+        default:
+            //直接转发
+            upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+            free(received_packet_buffer);
+            if (!upstream_answer)
+                return; //上游无响应直接返回
+            else {
+                if (send(client_fd, upstream_answer, packet_length, 0) < 0)
+                    LOG(LOG_ERR, "Failed to send response\n");
+                free(upstream_answer);
+            }
             break;
         }
     }

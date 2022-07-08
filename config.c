@@ -7,48 +7,67 @@
 #include<errno.h>
 #include<string.h>
 
-
+#include "debug.h"
 #include "config.h"
 #include "socket.h"
 #include "protocol.h"
 
+struct _raw_config raw_config;
+struct config loaded_config;
+bool enable_cfDNS;
+bool enable_mem_cache;
+unsigned char debug_level;
+
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
-    if (isIPv6(raw_config.bind_ip)){
-        struct sockaddr_in6 *listen=malloc(sizeof(struct sockaddr_in6));
-        listen->sin6_port = htons(raw_config.bind_port);
-        listen->sin6_family = AF_INET6;
-        if (inet_pton(AF_INET6,raw_config.bind_ip,&listen->sin6_addr) <= 0){
-            printf("Error: Wrong bind address\n");
+    void *listen_addr;
+
+    if (isValidIPv6(raw_config.bind_ip)){
+        listen_addr = (struct sockaddr_in6 *)malloc(sizeof(struct sockaddr_in6));
+        memset(listen_addr, 0, sizeof(struct sockaddr_in6));
+        ((struct sockaddr_in6 *)listen_addr)->sin6_port = htons(raw_config.bind_port);
+        ((struct sockaddr_in6 *)listen_addr)->sin6_family = AF_INET6;
+        if (inet_pton(AF_INET6,raw_config.bind_ip,&((struct sockaddr_in6 *)listen_addr)->sin6_addr) <= 0){
+            LOG(LOG_FATAL, "Wrong binding address\n");
             exit(errno);
         }
     }
     else{
-        struct sockaddr_in *listen=malloc(sizeof(struct sockaddr_in));
-        listen->sin_port = htons(raw_config.bind_port);
-        listen->sin_family = AF_INET;
-        if (inet_pton(AF_INET,raw_config.bind_ip,&listen->sin_addr) <= 0){
-            printf("Error: Wrong bind address\n");
+        listen_addr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+        memset(listen_addr, 0, sizeof(struct sockaddr_in));
+        ((struct sockaddr_in *)listen_addr)->sin_port = htons(raw_config.bind_port);
+        ((struct sockaddr_in *)listen_addr)->sin_family = AF_INET;
+        void *sin_addr = &(((struct sockaddr_in *)listen_addr)->sin_addr);
+        if (inet_pton(AF_INET,raw_config.bind_ip,sin_addr) <= 0){
+            LOG(LOG_FATAL, "Wrong binding address\n");
             exit(errno);
         }
     }
-    loaded_config.listen = listen;
+    loaded_config.listen = listen_addr;
     int i = 0,j = 0;
     for (i = 0,j = 0; raw_config.UDP_server[i][0] && i < 8; i++){
         char *token_index = strtok(raw_config.UDP_server[i],":");
-        loaded_config.udp_server[j]->sin_family = AF_INET;
+        if (!loaded_config.udp_server[j])
+            loaded_config.udp_server[j] = malloc(sizeof(loaded_config.udp_server[j]));
+
         if(inet_pton(AF_INET, token_index, &loaded_config.udp_server[j]->sin_addr) <= 0)
             continue;
+
         loaded_config.udp_server[j]->sin_port = htons(atoi(strtok(NULL,":")));
+        loaded_config.udp_server[j]->sin_family = AF_INET;
         j++;
     }
     loaded_config.udp_num = j;
 
     for (i = 0,j = 0; raw_config.TCP_server[i][0] && i < 8; i++){
         char *token_index = strtok(raw_config.TCP_server[i],":");
-        loaded_config.tcp_server[j]->sin_family = AF_INET;
+        if (!loaded_config.tcp_server[j])
+            loaded_config.tcp_server[j] = malloc(sizeof(loaded_config.tcp_server[j]));
+
         if(inet_pton(AF_INET, token_index, &loaded_config.tcp_server[j]->sin_addr) <= 0)
             continue;
+        
+        loaded_config.tcp_server[j]->sin_family = AF_INET;
         loaded_config.tcp_server[j]->sin_port = htons(atoi(strtok(NULL,":")));
         j++;
     }
@@ -65,30 +84,30 @@ void ArgParse(int argc,char *argv[]){
 
     enable_cfDNS = raw_config.enable_cfDNS;
     enable_mem_cache = raw_config.enable_mem_cache;
+    debug_level = raw_config.debug_level;
 }
 
 void preArgParse(int argc,char *argv[]){
 
     FILE *fp = NULL;
     if (argc == 1) {
-        printf("Reading config from default config.txt\n");
+        LOG(LOG_INFO, "Reading config from default config.txt\n");
         fp = fopen("config.txt", "r");
     }
     else{
-        printf("Reading config from %s\n",argv[1]);
+        LOG(LOG_INFO, "Reading config from %s\n",argv[1]);
         fp = fopen(argv[1], "r");
     }
 
     if (!fp){
         int errnum = errno;
-        fprintf(stderr, "Error: failed to open config file: %s\n", strerror(errnum));
+        LOG(LOG_FATAL, "Failed to open config file: %s\n", strerror(errnum));
         exit(errno);
     }
 
     char tmp[256];
     
     strncpy(raw_config.bind_ip, ReadLine(fp, "bind_ip", tmp), 41);
-    puts(raw_config.bind_ip);
     raw_config.bind_port = atoi(ReadLine(fp, "bind_port", tmp));
     raw_config.hosts = fopen(ReadLine(fp, "hosts_file", tmp), "r");
     raw_config.enable_AAAA = ReadLine(fp, "enable_AAAA", tmp)[0] - 48;
@@ -144,7 +163,8 @@ void preArgParse(int argc,char *argv[]){
             token_index=strtok(NULL, "\", ");
         }
     }
-    printf("Config loaded\n");
+    LOG(LOG_INFO, "Config loaded\n");
+    close(fp);
 }
 
 char *ReadLine(FILE *fp, char str[], char *readin){
@@ -159,7 +179,7 @@ char *ReadLine(FILE *fp, char str[], char *readin){
                     return readin+i+1;
         }
     }
-    printf("Error: missing config value \"%s\"\n", str);
+    LOG(LOG_FATAL, "Missing config value \"%s\"\n", str);
     exit(EXIT_FAILURE);
     return NULL;
 }
