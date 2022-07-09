@@ -156,7 +156,3 @@ char *LookupType(const int type){
         break;
     }
 }
-
-
-int isCached(){};
-int GetCacheEntry(){};

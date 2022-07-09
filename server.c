@@ -1,5 +1,7 @@
 #include "server.h"
 #include "hosts.h"
+#include "hash.h"
+#include "cache.h"
 
 static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,0x2d,
                             0x73,0x65,0x72,0x76,0x65,0x72,0x73,0x03,0x6e,0x65,
@@ -10,22 +12,25 @@ static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,
                             0x3a,0x80,0x00,0x01,0x51,0x80};
 
 void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , void *received_packet_buffer, int received_packet_length){
-    struct dns_request *query;
-    char *upstream_answer, *buffer;
-    int q_count, packet_length;
+    struct dns_request *query = NULL;
+    struct dns_cache *cache_entry = NULL;
+    struct dns_response **cache_response = NULL;
+    struct dns_response *cache_response_entry = NULL;
+    char *upstream_answer = NULL, *buffer = NULL;
+    int q_count, packet_length, an_count;
+    uint16_t cache_req_id;
     int n_size = sizeof(struct sockaddr);
+    uint32_t name_hash, cache_ttl;
+    int time_watch = time(NULL);
 
     query = ParseDnsQuery(received_packet_buffer, received_packet_length, &q_count);
 
-    if (q_count == -1)
-        //关闭socket，直接丢包
-        return;
+    if (q_count == -1); //直接丢包
+
     //收到未知类型DNS请求，不处理直接转发
     if (!query) {
         upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
-        free(received_packet_buffer);
-        if (!upstream_answer)
-            return; //上游无响应直接返回
+        if (!upstream_answer); //上游无响应直接返回
         else {
             if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
                 LOG(LOG_ERR, "Failed to send response\n");
@@ -40,20 +45,82 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
         switch (query->q_type) {
         case DNS_A_RECORD:
             hosts_entry = inHosts(hosts_trie, query->name);
-
+            
             if (hosts_entry) {
                 buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, GetHostsEntry(hosts_entry, 'A'), DEFAULT_TTL);
                 LOG(LOG_DBG, "Hit hosts entry: %s\n", query->name);
 
-                if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //发回hosts对应的信息
+                if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //发回 hosts 对应的信息
                     LOG(LOG_ERR, "Failed to send response\n");
+                free(buffer);
             }
 
-            else if (enable_mem_cache){
-                if (isCached(query->name)) {
-                    buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, GetCacheEntry(query->name, 'A'), DEFAULT_TTL);
+            else if (enable_mem_cache) {
+                name_hash = hashlittle(query->name, strlen(query->name), HASH_A_INITVAL);
+                cache_entry = GetCacheEntry(name_hash);
+                if (cache_entry) {
+                    buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, &cache_entry->ip4, cache_entry->ttl);
+                    LOG(LOG_DBG, "Hit cache entry: %s\n", query->name);
+
+                    if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //发回 cache 对应的信息
+                        LOG(LOG_ERR, "Failed to send response\n");
+                    free(buffer);
+
+                    if (cache_entry->expire_time + 20 <= time(NULL)) {
+                        //预超时机制                        
+                        buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_A_RECORD);
+                        upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
+                        free(buffer);
+                        cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+                        if (cache_response_entry) {
+                            int cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
+                                               raw_config.min_cache_ttl : cache_response_entry->cache_time;
+                            LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
+                            cache_entry->ttl = cache_ttl;
+                            cache_entry->ip4 = htonl(cache_response_entry->ip_addr);
+                        }
+                    }
+                }
+
+                else {
+                    //无此记录
+                    buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_A_RECORD);
+                    upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
+                    free(buffer);
+
+                    cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                    
+                    if (an_count >= 0) {
+                        //可能的无效回应，不缓存
+                        ModifyID(upstream_answer, query->id);
+                        if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
+                            LOG(LOG_ERR, "Failed to send response\n");
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+                        if (cache_response_entry) {
+                            cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
+                                               raw_config.min_cache_ttl : cache_response_entry->cache_time;
+                            AddEntryToCache(name_hash, cache_ttl, &cache_response_entry->ip_addr, NULL);
+                        }
+                    }
+                    
+                }
+                free(upstream_answer);
+                free(cache_response);
+
+            }
+
+            else {
+                upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+                if (!upstream_answer)
+                    LOG(LOG_WARN, "Upstream did not respond\n"); //上游无响应直接返回
+                else {
+                    if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
+                        LOG(LOG_ERR, "Failed to send response\n");
+                    free(upstream_answer);
                 }
             }
+            
             break;
         case DNS_AAAA_RECORD:
             hosts_entry = inHosts(hosts_trie, query->name);
@@ -64,20 +131,79 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                 
                 if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //发回hosts对应的信息
                     LOG(LOG_ERR, "Failed to send response\n");
+                free(buffer);
             }
 
-            else if (isCached(query->name)) {
+            else if (enable_mem_cache) {
+                name_hash = hashlittle(query->name, strlen(query->name), HASH_AAAA_INITVAL);
+                cache_entry = GetCacheEntry(name_hash);
+                if (cache_entry) {
+                    buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, &cache_entry->ip6, cache_entry->ttl);
+                    LOG(LOG_DBG, "Hit cache entry: %s\n", query->name);
 
+                    if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //发回 cache 对应的信息
+                        LOG(LOG_ERR, "Failed to send response\n");
+                    free(buffer);
+
+                    if (cache_entry->expire_time + 20 <= time(NULL)) {
+                        //预超时机制                        
+                        buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_AAAA_RECORD);
+                        upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
+                        free(buffer);
+                        cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_AAAA_RECORD);
+                        if (cache_response_entry) {
+                            int cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
+                                               raw_config.min_cache_ttl : cache_response_entry->cache_time;
+                            LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
+                            cache_entry->ttl = cache_ttl;
+                            cache_entry->ip6 = cache_response_entry->ip6_addr;
+                        }
+                    }
+                }
+
+                else {
+                    //无此记录
+                    buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_AAAA_RECORD);
+                    upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
+                    free(buffer);
+
+                    cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                    
+                    if (an_count >= 0) {
+                        //直接转发响应
+                        ModifyID(upstream_answer, query->id);
+                        if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
+                            LOG(LOG_ERR, "Failed to send response\n");
+
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_AAAA_RECORD);
+                        if (cache_response_entry) {
+                            cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
+                                               raw_config.min_cache_ttl : cache_response_entry->cache_time;
+                            AddEntryToCache(name_hash, cache_ttl, NULL, &cache_response_entry->ip6_addr);
+                        }
+                    }
+                    
+                }
+                free(upstream_answer);
+                free(cache_response);
+            }
+            else {
+                upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+                if (!upstream_answer)
+                    LOG(LOG_WARN, "Upstream did not respond\n"); //上游无响应直接返回
+                else {
+                    if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
+                        LOG(LOG_ERR, "Failed to send response\n");
+                    free(upstream_answer);
+                }
             }
             break;
         default:
             //直接转发
             upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
-            free(received_packet_buffer);
-            if (!upstream_answer) {
-                LOG(LOG_WARN, "Upstream did not respond\n");
-                return; //上游无响应直接返回
-            }
+            if (!upstream_answer)
+                LOG(LOG_WARN, "Upstream did not respond\n"); //上游无响应直接返回
             else {
                 if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
                     LOG(LOG_ERR, "Failed to send response\n");
@@ -86,6 +212,9 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
             break;
         }
     }
+    
+    free(received_packet_buffer);
+    free(query);
 }
 
 struct dns_request *ParseDnsQuery(void *packet_buffer, int packet_length, int *q_count) {
@@ -184,7 +313,7 @@ void *BuildDnsResponsePacket(const char *domain_name,
 			                 const uint16_t request_id, 
                              const int response_q_type, 
                              const void *answer_in, 
-                             const int ttl) {
+                             const uint32_t ttl) {
 
     struct dns_header *header;
     struct dns_query_trailer *q_trailer;
@@ -267,6 +396,7 @@ void *BuildDnsResponsePacket(const char *domain_name,
     
     //资源记录区
     if (!answer) {
+        //返回固定 SOA 记录
         struct dns_rr_trailer_A *rr_trailer = (struct dns_rr_trailer_A *)buffer;
         rr_trailer->rr_class = htons(DNS_INET_ADDR);
         rr_trailer->rr_type = htons(DNS_SOA_RECORD);
@@ -280,9 +410,9 @@ void *BuildDnsResponsePacket(const char *domain_name,
         rr_trailer->rr_class = htons(DNS_INET_ADDR);
         rr_trailer->rr_type = htons(DNS_A_RECORD);
         rr_trailer->rr_domain_pointer = htons(0xc00c);
-        rr_trailer->rr_ttl = htons(DEFAULT_TTL);
         buffer += 10;
         *(uint16_t *)buffer  = htons(sizeof(uint32_t)); //RDATA长度
+        *(uint32_t *)((char*)buffer - 4) = htonl(ttl);
         buffer += 2;
         *(uint32_t *)buffer = *(uint32_t *)answer;
     }
@@ -291,12 +421,17 @@ void *BuildDnsResponsePacket(const char *domain_name,
         rr_trailer->rr_class = htons(DNS_INET_ADDR);
         rr_trailer->rr_type = htons(DNS_AAAA_RECORD);
         rr_trailer->rr_domain_pointer = htons(0xc00c);
-        rr_trailer->rr_ttl = htons(DEFAULT_TTL);
         buffer += 10;
         *(uint16_t *)buffer  = htons(sizeof(__uint128_t)); //RDATA长度
+        *(uint32_t *)((char*)buffer - 4) = htonl(ttl);
         buffer += 2;
         memcpy(buffer, answer, sizeof(__uint128_t));
     }
 
     return dnspacket;
+}
+
+static void ModifyID(void *buffer, uint16_t id) {
+    if (buffer)
+        *(uint16_t *)buffer = htons(id);
 }

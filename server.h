@@ -17,8 +17,10 @@ void *BuildDnsResponsePacket(const char *domain_name,
 			                 const uint16_t request_id, 
                              const int response_q_type, 
                              const void *answer_in, 
-                             const int ttl);
+                             const uint32_t ttl);
 void ProcessDnsQuery(const int client_fd, 
                      const struct sockaddr *client_addr, 
                      void *received_packet_buffer, 
                      int received_packet_length);
+
+static void ModifyID(void *buffer, uint16_t id);

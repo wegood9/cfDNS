@@ -1,15 +1,17 @@
 #测试
 bind_ip 10.1.0.100
 bind_port 6553
-UDP_server 1.1.1.1:6553,1.0.0.1:53, 8.8.8.8:53
+UDP_server 114.114.114.114:53,223.5.5.5:53,223.6.6.6:53
 TCP_server 
 DoH_server 
 DoT_server 
 debug 10
 hosts_file hosts
 enable_AAAA 1
-enable_mem_cache 0
-ttl_multiplier 1
+enable_mem_cache 1
+ttl_multiplier 2
+cache_size 3
+min_cache_ttl 60
 #test
 
 enable_cfDNS 0

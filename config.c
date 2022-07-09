@@ -11,6 +11,7 @@
 #include "config.h"
 #include "socket.h"
 #include "protocol.h"
+#include "cache.h"
 
 struct _raw_config raw_config;
 struct config loaded_config;
@@ -18,7 +19,9 @@ bool enable_cfDNS = 0;
 bool enable_mem_cache = 0;
 unsigned char debug_level = 0;
 unsigned char ttl_multiplier = 0;
+int cache_size = 0;
 struct trieNode *hosts_trie = NULL;
+struct dns_cache *cache = NULL;
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
@@ -110,6 +113,11 @@ void ArgParse(int argc,char *argv[]){
     enable_cfDNS = raw_config.enable_cfDNS;
     enable_mem_cache = raw_config.enable_mem_cache;
     debug_level = raw_config.debug_level;
+    cache_size = raw_config.cache_size;
+
+    if (enable_mem_cache)
+        cache = InitCache();
+
 }
 
 void preArgParse(int argc,char *argv[]){
@@ -137,7 +145,9 @@ void preArgParse(int argc,char *argv[]){
     raw_config.hosts = fopen(ReadLine(fp, "hosts_file", tmp), "r");
     raw_config.enable_AAAA = ReadLine(fp, "enable_AAAA", tmp)[0] - 48;
     raw_config.enable_mem_cache = ReadLine(fp, "enable_mem_cache", tmp)[0] - 48;
+    raw_config.cache_size = atoi(ReadLine(fp, "cache_size", tmp));
     raw_config.ttl_multiplier = atoi(ReadLine(fp, "ttl_multiplier", tmp));
+    raw_config.min_cache_ttl = atoi(ReadLine(fp, "min_cache_ttl", tmp));
     raw_config.debug_level = ReadLine(fp, "debug", tmp)[0] - 48;
 
     char *token_index=strtok(ReadLine(fp, "UDP_server", tmp), ", ");

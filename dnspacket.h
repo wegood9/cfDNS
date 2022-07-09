@@ -49,8 +49,8 @@ struct dns_query_trailer {
 struct dns_response {
     uint16_t response_type;
     uint16_t preference; //MX 记录
-    uint32_t cache_time; //ttl
-    uint32_t ip_addr; //ipv4 地址
+    uint32_t cache_time; //ttl，主机序
+    uint32_t ip_addr; //ipv4 地址，主机序
     __uint128_t ip6_addr; //ipv6 地址
     char name[MAX_DOMAIN_LENGTH + 1]; // CNAME, MX, NS，TXT 等使用
     uint8_t authoritative; //权威响应

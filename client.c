@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <poll.h>
+#include <limits.h>
 
 #include "debug.h"
 #include "protocol.h"
@@ -15,7 +16,7 @@
 #define MAX_AN_COUNT 50
 
 void *BuildDnsRequestPacket(const char *domain_name, int *packet_size, 
-			       int *request_id, int request_q_type) {
+			       uint16_t *request_id, int request_q_type) {
 
     struct dns_header *header;
     struct dns_query_trailer *q_trailer;
@@ -40,9 +41,9 @@ void *BuildDnsRequestPacket(const char *domain_name, int *packet_size,
     }
 
     //设置包头部分
-    *request_id = request_id == NULL ? rand() % UINT16_MAX : *request_id;
+    *request_id = rand() % UINT16_MAX;
     header = (struct dns_header *)buffer;
-    memset(&header, 0, HEADER_SIZE);
+    memset(header, 0, HEADER_SIZE);
     header->id = htons(*request_id);
     header->flags = htons(DNS_USE_RECURSION);
     header->qd_count = htons(1);
@@ -249,8 +250,14 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
         }
 
         responses[i].cache_time = ntohl(*(uint32_t *)buffer_index);
-        if (ttl_multiplier)
+        
+        if (ttl_multiplier) {
             responses[i].cache_time *= ttl_multiplier;
+
+            if (responses[i].cache_time < ntohl(*(uint32_t *)buffer_index))
+                responses[i].cache_time = UINT32_MAX; //判断溢出
+        }
+        
         if (!inc(&buffer_index, packet_end, sizeof(uint32_t))) {
             free(responses);
             LOG(LOG_INFO, "Receiving an invalid response\n");
@@ -273,7 +280,7 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
             break;
 
         case DNS_AAAA_RECORD:
-            responses[i].ip6_addr = ntohl(*(__uint128_t *)buffer_index);
+            memcpy(&responses[i].ip6_addr, buffer_index, sizeof(__uint128_t));
             break;
         //！以下仅供展示，实际不做处理
         case DNS_NS_RECORD:
@@ -383,4 +390,15 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             return buffer;
         }
     }
+}
+
+struct dns_response *GetRecordPointerFromResponse(struct dns_response *response, int answer_count, int type) {
+
+    if (answer_count > 0 && response) {
+        for (int i = 0; i < answer_count; i++) {
+            if (response[i].response_type == type)
+                return &response[i];
+        }
+    }
+    return NULL;
 }

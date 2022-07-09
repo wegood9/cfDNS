@@ -17,6 +17,8 @@ struct _raw_config
     unsigned char debug_level;
     unsigned char cf_IP_version;
     unsigned char ttl_multiplier;
+    unsigned int cache_size;
+    unsigned short min_cache_ttl;
     char cf_IP[16][41];
     bool enable_AAAA,enable_mem_cache,enable_cfDNS;
 };
@@ -36,6 +38,8 @@ extern struct _raw_config raw_config;
 extern struct config loaded_config;
 extern unsigned char ttl_multiplier;
 extern struct trieNode *hosts_trie;
+extern struct dns_cache *cache;
+extern int cache_size;
 
 static void preArgParse(int argc,char *argv[]);
 static char *ReadLine(FILE *fp, char str[], char *readin);
