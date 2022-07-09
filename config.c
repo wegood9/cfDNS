@@ -150,6 +150,7 @@ void preArgParse(int argc,char *argv[]){
     raw_config.ttl_multiplier = atoi(ReadLine(fp, "ttl_multiplier", tmp));
     raw_config.min_cache_ttl = atoi(ReadLine(fp, "min_cache_ttl", tmp));
     raw_config.debug_level = ReadLine(fp, "debug", tmp)[0] - 48;
+    raw_config.bind_tcp = ReadLine(fp, "bind_tcp", tmp)[0] - 48;
 
     char *token_index=strtok(ReadLine(fp, "UDP_server", tmp), ", ");
     for (unsigned char i = 0; token_index && i < 8; i++){

@@ -48,7 +48,7 @@ int main(int argc, char *argv[] ){
         exit(EXIT_FAILURE);
     }
 
-    if (1) {
+    if (raw_config.bind_tcp) {
         pthread_t tcp;
         pthread_create(&tcp, NULL, tcp_server_thread, NULL);
     }
@@ -125,7 +125,7 @@ void *tcp_server_thread(void) {
         }
         else
             LOG(LOG_INFO, "Received a TCP DNS request\n");
-            
+
         chosen_server = rand() % loaded_config.tcp_num;
         if ((sendfd = socket(loaded_config.tcp_server[chosen_server]->ss_family, SOCK_STREAM, 0)) < 0) {
             LOG(LOG_ERR, "Failed to create socket: %s\n", strerror(errno));

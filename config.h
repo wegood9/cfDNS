@@ -20,7 +20,7 @@ struct _raw_config
     unsigned int cache_size;
     unsigned short min_cache_ttl;
     char cf_IP[16][41];
-    bool enable_AAAA,enable_mem_cache,enable_cfDNS;
+    bool enable_AAAA,enable_mem_cache,enable_cfDNS,bind_tcp;
 };
 
 struct config
