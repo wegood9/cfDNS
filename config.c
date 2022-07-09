@@ -25,21 +25,19 @@ struct dns_cache *cache = NULL;
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
-    void *listen_addr;
+    struct sockaddr_storage *listen_addr = malloc(sizeof(struct sockaddr_storage));;
 
     if (isValidIPv6(raw_config.bind_ip)){
-        listen_addr = (struct sockaddr_in6 *)malloc(sizeof(struct sockaddr_in6));
-        memset(listen_addr, 0, sizeof(struct sockaddr_in6));
+        memset(listen_addr, 0, sizeof(struct sockaddr_storage));
+        ((struct sockaddr_in6 *)listen_addr)->sin6_scope_id = GetScopeForIp(raw_config.bind_ip);
         ((struct sockaddr_in6 *)listen_addr)->sin6_port = htons(raw_config.bind_port);
         ((struct sockaddr_in6 *)listen_addr)->sin6_family = AF_INET6;
-        if (inet_pton(AF_INET6,raw_config.bind_ip,&((struct sockaddr_in6 *)listen_addr)->sin6_addr) <= 0){
+        if (inet_pton(AF_INET6,raw_config.bind_ip,&(((struct sockaddr_in6 *)listen_addr)->sin6_addr.s6_addr)) <= 0){
             LOG(LOG_FATAL, "Wrong binding address\n");
             exit(errno);
         }
     }
     else{
-        listen_addr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
-        memset(listen_addr, 0, sizeof(struct sockaddr_in));
         ((struct sockaddr_in *)listen_addr)->sin_port = htons(raw_config.bind_port);
         ((struct sockaddr_in *)listen_addr)->sin_family = AF_INET;
         void *sin_addr = &(((struct sockaddr_in *)listen_addr)->sin_addr);
@@ -79,6 +77,9 @@ void ArgParse(int argc,char *argv[]){
 
     for (i = 0,j = 0; raw_config.TCP_server[i][0] && i < 8; i++){
         char *token_index = strtok(raw_config.TCP_server[i],":");
+        if (!loaded_config.tcp_server[j])
+            loaded_config.tcp_server[j] = malloc(sizeof(struct sockaddr_storage));
+        
         // 读入IPv6地址格式
         if (token_index[strlen(token_index) - 1] == ']') {
             //去掉头尾的中括号

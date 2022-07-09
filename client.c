@@ -8,6 +8,7 @@
 #include <poll.h>
 #include <limits.h>
 
+
 #include "debug.h"
 #include "protocol.h"
 #include "config.h"
@@ -97,7 +98,8 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
     struct dns_response *responses;
 
     *answer_count = 0;
-
+    if (!packet_buffer)
+        return NULL;
     if (packet_length < HEADER_SIZE) {
         LOG(LOG_INFO, "Rceiving an invalid DNS response\n");
         *answer_count = -1;
@@ -339,7 +341,7 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
 }
 
 char *SendDnsRequest(char *query, int length, int *recv_length) {
-    char server_num = loaded_config.udp_num + loaded_config.tcp_num + loaded_config.doh_num + loaded_config.dot_num;
+    char server_num = loaded_config.udp_num + loaded_config.tcp_num;
     char chosen_server = rand() % server_num;
     int sockfd = 0;
     char *buffer;
@@ -350,9 +352,7 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
 
     fd.events = POLLIN;
 
-    chosen_server -= loaded_config.udp_num;
-    if (chosen_server <= 0) {
-        chosen_server += loaded_config.udp_num;
+    if (chosen_server < loaded_config.udp_num) {
         if ((sockfd = socket(loaded_config.udp_server[chosen_server]->ss_family, SOCK_DGRAM, 0)) < 0 &&
                 connect_with_timeout(sockfd, 
                                      (struct sockaddr*)loaded_config.udp_server[chosen_server], 
@@ -380,6 +380,45 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
         if (*recv_length < 20) {
             LOG(LOG_WARN, "Failed to receive answer from %s\n", raw_config.UDP_server[chosen_server]);
+            close(sockfd);
+            free(buffer);
+            return NULL;
+        }
+        else {
+            buffer[*recv_length] = 0;
+            close(sockfd);
+            return buffer;
+        }
+    }
+    else if (chosen_server < loaded_config.udp_num + loaded_config.tcp_num) {
+        chosen_server -= loaded_config.udp_num;
+        if ((sockfd = socket(loaded_config.tcp_server[chosen_server]->ss_family, SOCK_STREAM, 0)) < 0) {
+            LOG(LOG_ERR, "Failed to create socket for recursive query: %s\n", strerror(errno));
+            close(sockfd);
+            return NULL;
+        }
+        if (connect_with_timeout(sockfd, 
+                                 (struct sockaddr*)loaded_config.tcp_server[chosen_server], 
+                                 sizeof(struct sockaddr), 
+                                 GLOBAL_TIMEOUT
+                                ) < 0) {
+            LOG(LOG_ERR, "Failed to connect to upstream: %s\n", strerror(errno));
+            close(sockfd);
+            return NULL;
+        }
+
+        uint16_t head_length = htons(length);
+        send(sockfd, (char*)&head_length, sizeof(uint16_t), 0);
+        send(sockfd, query, length, 0);
+
+        buffer = malloc(513 * sizeof(uint8_t));
+        *recv_length = 0;
+        recv(sockfd, buffer, 2, 0);
+        *recv_length = ntohs(*(uint16_t*)buffer);
+
+        *recv_length = recv(sockfd, buffer, *recv_length, 0);
+        if (*recv_length < 20) {
+            LOG(LOG_WARN, "Failed to receive answer from %s\n", raw_config.TCP_server[chosen_server]);
             close(sockfd);
             free(buffer);
             return NULL;
