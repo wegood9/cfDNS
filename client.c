@@ -253,8 +253,8 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
 
         responses[i].cache_time = ntohl(*(uint32_t *)buffer_index);
         
-        if (ttl_multiplier) {
-            responses[i].cache_time *= ttl_multiplier;
+        if (raw_config.ttl_multiplier) {
+            responses[i].cache_time *= raw_config.ttl_multiplier;
 
             if (responses[i].cache_time < ntohl(*(uint32_t *)buffer_index))
                 responses[i].cache_time = UINT32_MAX; //判断溢出

@@ -29,6 +29,8 @@ int main(int argc, char *argv[] ){
     struct param *para;
     int n_size = sizeof(struct sockaddr);
 
+
+
     hosts_trie = InitHosts(raw_config.hosts);
     if (!hosts_trie)
         LOG(LOG_WARN, "Failed to load hosts: %s\n", strerror(errno));

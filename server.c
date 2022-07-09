@@ -8,12 +8,12 @@
 
 #include "server.h"
 #include "hosts.h"
-#include "hash.h"
 #include "cache.h"
 #include "debug.h"
 #include "protocol.h"
 #include "config.h"
 #include "client.h"
+#include "socket.h"
 
 static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,0x2d,
                             0x73,0x65,0x72,0x76,0x65,0x72,0x73,0x03,0x6e,0x65,
@@ -26,7 +26,7 @@ static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,
 void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , void *received_packet_buffer, int received_packet_length){
     struct dns_request *query = NULL;
     struct dns_cache *cache_entry = NULL;
-    struct dns_response **cache_response = NULL;
+    struct dns_response *cache_response = NULL;
     struct dns_response *cache_response_entry = NULL;
     char *upstream_answer = NULL, *buffer = NULL;
     int q_count, packet_length, an_count;
@@ -66,8 +66,8 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                     LOG(LOG_ERR, "Failed to send response\n");
                 free(buffer);
             }
-
-            else if (enable_mem_cache) {
+            
+            else if (raw_config.enable_mem_cache) {
                 name_hash = hashlittle(query->name, strlen(query->name), HASH_A_INITVAL);
 
                 pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock)
@@ -109,12 +109,36 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
 
                     cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
                     
+
                     if (an_count >= 0) {
                         //可能的无效回应，不缓存
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+
+                        //cfDNS功能
+                        if (raw_config.enable_cfDNS && cache_response_entry && MatchIPv4Cf(&(cache_response_entry->ip_addr))) {
+                            //根据设置构造DNS回复
+                            if (loaded_config.cf_IP_version == 4) {
+                                buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, &loaded_config.cf_IPv4, 0);
+                                InsertHosts(hosts_trie, query->name, &loaded_config.cf_IPv4, NULL);
+                            }
+                            else {
+                                buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, NULL, 0);
+                                InsertHosts(hosts_trie, query->name, NULL, &loaded_config.cf_IPv6);
+                            }
+                            if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //返回指定ip
+                                LOG(LOG_ERR, "Failed to send response\n");
+                            
+                            
+                            free(upstream_answer);
+                            free(cache_response);
+                            free(buffer);
+                            break;
+                        }
+
                         ModifyID(upstream_answer, query->id);
                         if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
                             LOG(LOG_ERR, "Failed to send response\n");
-                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+                        
                         if (cache_response_entry) {
                             cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : cache_response_entry->cache_time;
@@ -135,6 +159,31 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
 
             else {
                 upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+                
+                //cfDNS功能
+                if (raw_config.enable_cfDNS) {
+                    cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                    cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+                    if (cache_response_entry && MatchIPv4Cf(&(cache_response_entry->ip_addr))) {
+                        //根据设置构造DNS回复
+                        if (loaded_config.cf_IP_version == 4) {
+                            buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, &loaded_config.cf_IPv4, 0);
+                            InsertHosts(hosts_trie, query->name, &loaded_config.cf_IPv4, NULL);
+                        }
+                        else {
+                            buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, NULL, 0);
+                            InsertHosts(hosts_trie, query->name, NULL, &loaded_config.cf_IPv6);
+                        }
+                        if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //返回指定ip
+                            LOG(LOG_ERR, "Failed to send response\n");
+                        free(upstream_answer);
+                        free(cache_response);
+                        free(buffer);
+                        break;
+                    }
+                    free(cache_response);
+                }
+
                 if (!upstream_answer)
                     LOG(LOG_WARN, "Upstream did not respond\n"); //上游无响应直接返回
                 else {
@@ -146,6 +195,17 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
             
             break;
         case DNS_AAAA_RECORD:
+
+            if (!raw_config.enable_AAAA) {
+                buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, NULL, 0);
+
+                if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //返回 SOA 记录
+                    LOG(LOG_ERR, "Failed to send response\n");
+                free(buffer);
+                break;
+            }
+
+
             hosts_entry = inHosts(hosts_trie, query->name);
 
             if (hosts_entry) {
@@ -157,7 +217,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                 free(buffer);
             }
 
-            else if (enable_mem_cache) {
+            else if (raw_config.enable_mem_cache) {
                 name_hash = hashlittle(query->name, strlen(query->name), HASH_AAAA_INITVAL);
                 //缓存操作上锁
                 pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock)
@@ -200,12 +260,33 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                     cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
                     
                     if (an_count >= 0) {
+                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_AAAA_RECORD);
+
+                        if (raw_config.enable_cfDNS && cache_response_entry && MatchIPv6Cf(&(cache_response_entry->ip6_addr))) {
+                            //根据设置构造DNS回复
+                            if (loaded_config.cf_IP_version == 6) {
+                                buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, &loaded_config.cf_IPv6, 0);
+                                InsertHosts(hosts_trie, query->name, NULL, &loaded_config.cf_IPv6);
+                            }
+                            else {
+                                buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, NULL, 0);
+                                InsertHosts(hosts_trie, query->name, &loaded_config.cf_IPv4, NULL);
+                            }
+                            if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //返回指定ip
+                                LOG(LOG_ERR, "Failed to send response\n");
+                            
+                            
+                            free(upstream_answer);
+                            free(cache_response);
+                            free(buffer);
+                            break;
+                        }
+
                         //直接转发响应
                         ModifyID(upstream_answer, query->id);
                         if (sendto(client_fd, upstream_answer, packet_length, 0, client_addr, n_size) < 0)
                             LOG(LOG_ERR, "Failed to send response\n");
 
-                        cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_AAAA_RECORD);
                         if (cache_response_entry) {
                             cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : cache_response_entry->cache_time;
@@ -222,8 +303,35 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                 free(upstream_answer);
                 free(cache_response);
             }
+
+            //不使用缓存
             else {
                 upstream_answer = SendDnsRequest(received_packet_buffer, received_packet_length, &packet_length);
+
+                //cfDNS功能
+                if (raw_config.enable_cfDNS) {
+                    cache_response = ParseDnsResponse(upstream_answer, packet_length, cache_req_id, query->name, &an_count);
+                    cache_response_entry = GetRecordPointerFromResponse(cache_response, an_count, DNS_A_RECORD);
+                    if (cache_response_entry && MatchIPv6Cf(&(cache_response_entry->ip6_addr))) {
+                        //根据设置构造DNS回复
+                        if (loaded_config.cf_IP_version == 6) {
+                            buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, &loaded_config.cf_IPv6, 0);
+                            InsertHosts(hosts_trie, query->name, NULL, &loaded_config.cf_IPv6);
+                        }
+                        else {
+                            buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, NULL, 0);
+                            InsertHosts(hosts_trie, query->name, &loaded_config.cf_IPv4, NULL);
+                        }
+                        if (sendto(client_fd, buffer, packet_length, 0, client_addr, n_size) < 0) //返回指定ip
+                            LOG(LOG_ERR, "Failed to send response\n");
+                        free(upstream_answer);
+                        free(cache_response);
+                        free(buffer);
+                        break;
+                    }
+                    free(cache_response);
+                }
+
                 if (!upstream_answer)
                     LOG(LOG_WARN, "Upstream did not respond\n"); //上游无响应直接返回
                 else {
@@ -464,7 +572,21 @@ void *BuildDnsResponsePacket(const char *domain_name,
     return dnspacket;
 }
 
-static void ModifyID(void *buffer, uint16_t id) {
+void ModifyID(void *buffer, uint16_t id) {
     if (buffer)
         *(uint16_t *)buffer = htons(id);
+}
+
+bool MatchIPv4Cf(uint32_t *ip) {
+    for (int i = 0; i < loaded_config.cf4_num; i++)
+        if (cidr_match(ip, &(loaded_config.cf_IPv4_range[i]->ip4), loaded_config.cf_IPv4_range[i]->bits))
+            return true;
+    return false;
+}
+
+bool MatchIPv6Cf(struct in6_addr *ip6) {
+    for (int i = 0; i < loaded_config.cf6_num; i++)
+        if (cidr_match(ip6, &(loaded_config.cf_IPv6_range[i]->ip6), loaded_config.cf_IPv6_range[i]->bits))
+            return true;
+    return false;
 }

@@ -20,3 +20,4 @@ static void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4,
 extern struct trieNode * inHosts(struct trieNode *root, char *domain_name);
 extern void *GetHostsEntry(struct trieNode *p, char type);
 extern struct trieNode *InitHosts(FILE *hosts);
+extern void InsertHosts(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6);

@@ -7,9 +7,12 @@
 #include <stdlib.h>
 #include <sys/queue.h>
 
+#include "hash.h"
+
 extern pthread_mutex_t cache_lock;
 
-struct list_head {
+struct list_head
+{
 	struct list_head *next, *prev;
 };
 

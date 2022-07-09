@@ -116,6 +116,10 @@ struct trieNode *InitHosts(FILE *hosts) {
     return root;
 }
 
+void InsertHosts(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
+    InsertTrie(root, domain_name, ip4, ip6);
+}
+
 struct trieNode * inHosts(struct trieNode *root, char *domain_name) {
     return LookupTrie(root, domain_name, NULL, NULL);
 }

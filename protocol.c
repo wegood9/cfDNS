@@ -227,9 +227,10 @@ bool inc(char **buffer_p, char *packet_end, int bytes) {
     return *buffer_p >= packet_end ? 0 : 1;
 }
 
-char *LookupType(const int type){
+char *LookupType(const int type) {
     for (int i = 0; i < 89; i++)
         if (type == typestr[i].type)
             return typestr[i].name;
     return "Unknown";
 }
+

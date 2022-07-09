@@ -25,7 +25,7 @@ void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_
         new_entry->ip6 = *ip6;
     list_add(&new_entry->list, cache);
     cache->hash++; //容量加1
-    while (cache->hash > cache_size)
+    while (cache->hash > raw_config.cache_size)
     {
         //LRU删去尾节点
         LOG(LOG_INFO, "Cache is FULL, deleting one entry\n");
