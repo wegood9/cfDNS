@@ -1,7 +1,19 @@
+#include <pthread.h>
+#include<stdbool.h>
+#include<stdlib.h>
+#include<stdio.h>
+#include<string.h>
+#include<netinet/in.h>
+#include<stdint.h>
+
 #include "server.h"
 #include "hosts.h"
 #include "hash.h"
 #include "cache.h"
+#include "debug.h"
+#include "protocol.h"
+#include "config.h"
+#include "client.h"
 
 static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,0x2d,
                             0x73,0x65,0x72,0x76,0x65,0x72,0x73,0x03,0x6e,0x65,
@@ -57,7 +69,13 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
 
             else if (enable_mem_cache) {
                 name_hash = hashlittle(query->name, strlen(query->name), HASH_A_INITVAL);
-                cache_entry = GetCacheEntry(name_hash);
+
+                pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock)
+                    pthread_mutex_lock(&cache_lock);
+                    cache_entry = GetCacheEntry(name_hash);
+                    pthread_mutex_unlock(&cache_lock);
+                pthread_cleanup_pop(0);
+
                 if (cache_entry) {
                     buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_A_RECORD, &cache_entry->ip4, cache_entry->ttl);
                     LOG(LOG_DBG, "Hit cache entry: %s\n", query->name);
@@ -100,7 +118,12 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                         if (cache_response_entry) {
                             cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : cache_response_entry->cache_time;
-                            AddEntryToCache(name_hash, cache_ttl, &cache_response_entry->ip_addr, NULL);
+
+                            pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock);
+                            pthread_mutex_lock(&cache_lock);
+                                AddEntryToCache(name_hash, cache_ttl, &cache_response_entry->ip_addr, NULL);
+                            pthread_mutex_unlock(&cache_lock);
+                            pthread_cleanup_pop(0);
                         }
                     }
                     
@@ -136,7 +159,13 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
 
             else if (enable_mem_cache) {
                 name_hash = hashlittle(query->name, strlen(query->name), HASH_AAAA_INITVAL);
-                cache_entry = GetCacheEntry(name_hash);
+                //缓存操作上锁
+                pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock)
+                    pthread_mutex_lock(&cache_lock);
+                    cache_entry = GetCacheEntry(name_hash);
+                    pthread_mutex_unlock(&cache_lock);
+                pthread_cleanup_pop(0);
+
                 if (cache_entry) {
                     buffer = BuildDnsResponsePacket(query->name, &packet_length, query->id, DNS_AAAA_RECORD, &cache_entry->ip6, cache_entry->ttl);
                     LOG(LOG_DBG, "Hit cache entry: %s\n", query->name);
@@ -180,7 +209,12 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
                         if (cache_response_entry) {
                             cache_ttl = cache_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : cache_response_entry->cache_time;
-                            AddEntryToCache(name_hash, cache_ttl, NULL, &cache_response_entry->ip6_addr);
+
+                            pthread_cleanup_push(pthread_mutex_unlock, (void *) &cache_lock);
+                            pthread_mutex_lock(&cache_lock);
+                                AddEntryToCache(name_hash, cache_ttl, NULL, &cache_response_entry->ip6_addr);
+                            pthread_mutex_unlock(&cache_lock);
+                            pthread_cleanup_pop(0);
                         }
                     }
                     
@@ -213,7 +247,6 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
         }
     }
     
-    free(received_packet_buffer);
     free(query);
 }
 

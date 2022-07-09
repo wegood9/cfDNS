@@ -2,6 +2,8 @@
 #include "config.h"
 #include "debug.h"
 
+pthread_mutex_t cache_lock;
+
 struct dns_cache *InitCache() {
     struct dns_cache *head = malloc(sizeof(struct dns_cache));
     INIT_LIST_HEAD(&head->list);

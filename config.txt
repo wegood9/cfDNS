@@ -10,7 +10,7 @@ hosts_file hosts
 enable_AAAA 1
 enable_mem_cache 1
 ttl_multiplier 2
-cache_size 3
+cache_size 128
 min_cache_ttl 60
 #test
 
