@@ -13,7 +13,7 @@ struct dns_cache *InitCache() {
 void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_t *ip6) {
     struct dns_cache *new_entry = (struct dns_cache *)malloc(sizeof(struct dns_cache));
     struct dns_cache *trail_entry;
-    LOG(LOG_DBG, "Add new cache entry for %d\n", name_hash);
+    LOG(LOG_DBG, "Add new cache entry for %u\n", name_hash);
     new_entry->hash = name_hash;
     new_entry->ttl = ttl;
     new_entry->expire_time = time(NULL) + ttl;
@@ -49,7 +49,7 @@ struct dns_cache *GetCacheEntry(uint32_t name_hash) {
                 return cur;
             }
             else {
-                LOG(LOG_DBG, "Deleted expired entry: %d\n", name_hash);
+                LOG(LOG_DBG, "Deleted expired entry: %u\n", name_hash);
                 list_del(pos);
                 cache->hash--;
                 free(cur);
@@ -58,7 +58,7 @@ struct dns_cache *GetCacheEntry(uint32_t name_hash) {
         }
         //删去过期条目
         else if (cur->expire_time <= time(NULL)) {
-            LOG(LOG_DBG, "Deleted expired entry: %d\n", name_hash);
+            LOG(LOG_DBG, "Deleted expired entry: %u\n", name_hash);
             list_del(pos);
             cache->hash--;
             free(cur);
