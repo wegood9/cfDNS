@@ -341,21 +341,28 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
 
 char *SendDnsRequest(char *query, int length, int *recv_length) {
     char server_num = loaded_config.udp_num + loaded_config.tcp_num;
-    char chosen_server = rand() % server_num;
+    char chosen_server;
     int sockfd = 0;
     char *buffer;
-    int n_size = sizeof(struct sockaddr);
+    int n_size = sizeof(struct sockaddr_storage);
 
     struct pollfd fd;
     int res;
+
+    if (!server_num) {
+        LOG(LOG_ERR, "No valid upstream server found\n");
+        return NULL;
+    }
+    else
+        chosen_server = rand() % server_num;
 
     fd.events = POLLIN;
 
     if (chosen_server < loaded_config.udp_num) {
         if ((sockfd = socket(loaded_config.udp_server[chosen_server]->ss_family, SOCK_DGRAM, 0)) < 0 &&
                 connect_with_timeout(sockfd, 
-                                     (struct sockaddr*)loaded_config.udp_server[chosen_server], 
-                                     sizeof(struct sockaddr), 
+                                     (struct sockaddr_storager*)loaded_config.udp_server[chosen_server], 
+                                     sizeof(struct sockaddr_storage), 
                                      GLOBAL_TIMEOUT)
                                      < 0) {
             LOG(LOG_ERR, "Failed to create socket for recursive query: %s\n", strerror(errno));
@@ -376,7 +383,7 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
         fd.fd = sockfd;
         res = poll(&fd, 1, GLOBAL_TIMEOUT);
         if (res > 0)
-            *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr*)loaded_config.udp_server[chosen_server], &n_size);
+            *recv_length = recvfrom(sockfd, buffer, 512, 0, (struct sockaddr_storage*)loaded_config.udp_server[chosen_server], &n_size);
         if (*recv_length < 20) {
             LOG(LOG_WARN, "Failed to receive answer from %s\n", raw_config.UDP_server[chosen_server]);
             close(sockfd);
@@ -397,8 +404,8 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             return NULL;
         }
         if (connect_with_timeout(sockfd, 
-                                 (struct sockaddr*)loaded_config.tcp_server[chosen_server], 
-                                 sizeof(struct sockaddr), 
+                                 (struct sockaddr_storage*)loaded_config.tcp_server[chosen_server], 
+                                 sizeof(struct sockaddr_storage), 
                                  GLOBAL_TIMEOUT
                                 ) < 0) {
             LOG(LOG_ERR, "Failed to connect to upstream: %s\n", strerror(errno));
