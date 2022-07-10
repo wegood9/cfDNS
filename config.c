@@ -10,13 +10,12 @@
 #include "debug.h"
 #include "config.h"
 #include "protocol.h"
-#include "cache.h"
 
 struct _raw_config raw_config;
 struct config loaded_config;
 unsigned char debug_level = 0;
 struct trieNode *hosts_trie = NULL;
-struct dns_cache *cache = NULL;
+LRUCache* cache = NULL;
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);

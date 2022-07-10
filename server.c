@@ -7,8 +7,11 @@
 #include<stdint.h>
 
 #include "server.h"
-
-
+#include "hosts.h"
+#include "debug.h"
+#include "protocol.h"
+#include "config.h"
+#include "client.h"
 
 static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,0x2d,
                             0x73,0x65,0x72,0x76,0x65,0x72,0x73,0x03,0x6e,0x65,
@@ -79,8 +82,9 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_
                         LOG(LOG_ERR, "Failed to send response\n");
                     free(buffer);
 
-                    if (cache_entry->expire_time + 20 <= time(NULL)) {
-                        //预超时机制                        
+                    if (cache_entry->expire_time + 60 <= time(NULL)) {
+                        //预超时机制
+                        LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
                         buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_A_RECORD);
                         upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
                         free(buffer);
@@ -89,7 +93,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_
                         if (server_response_entry) {
                             int cache_ttl = server_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : server_response_entry->cache_time;
-                            LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
+                            cache_entry->expire_time = cache_ttl + time(NULL);
                             cache_entry->ttl = cache_ttl;
                             cache_entry->ip4 = server_response_entry->ip_addr;
                         }
@@ -243,8 +247,9 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_
                         LOG(LOG_ERR, "Failed to send response\n");
                     free(buffer);
 
-                    if (cache_entry->expire_time + 20 <= time(NULL)) {
-                        //预超时机制                        
+                    if (cache_entry->expire_time + 60 <= time(NULL)) {
+                        //预超时机制
+                        LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
                         buffer = BuildDnsRequestPacket(query->name, &packet_length, &cache_req_id, DNS_AAAA_RECORD);
                         upstream_answer = SendDnsRequest(buffer, packet_length, &packet_length);
                         free(buffer);
@@ -253,7 +258,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_
                         if (server_response_entry) {
                             int cache_ttl = server_response_entry->cache_time < raw_config.min_cache_ttl ?
                                                raw_config.min_cache_ttl : server_response_entry->cache_time;
-                            LOG(LOG_DBG, "Pre-timeout: %s\n", query->name);
+                            cache_entry->expire_time = cache_ttl + time(NULL);
                             cache_entry->ttl = cache_ttl;
                             cache_entry->ip6 = server_response_entry->ip6_addr;
                         }

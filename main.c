@@ -5,6 +5,10 @@
 #include <pthread.h>
 
 #include "server.h"
+#include "debug.h"
+#include "config.h"
+#include "protocol.h"
+#include "hosts.h"
 
 struct param {
     int listenfd;  

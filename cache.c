@@ -1,83 +1,97 @@
-#include "cache.h"
 #include "config.h"
 #include "debug.h"
+#include "uthash/uthash.h"
 
 pthread_mutex_t cache_lock;
 
-struct dns_cache *InitCache() {
-    struct dns_cache *head = malloc(sizeof(struct dns_cache));
-    INIT_LIST_HEAD(&head->list);
-    head->hash = 0; //当前缓存数量
-    return head;
+LRUCache *uthash = NULL;
+
+LRUCache *InitCache() {
+    return lRUCacheCreate(raw_config.cache_size);
 }
 
-
 void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_t *ip6) {
-    struct dns_cache *new_entry = (struct dns_cache *)malloc(sizeof(struct dns_cache));
-    struct dns_cache *trail_entry;
+    struct dns_cache new_entry;
     LOG(LOG_DBG, "Add new cache entry for %u\n", name_hash);
-    new_entry->hash = name_hash;
-    new_entry->ttl = ttl;
-    new_entry->expire_time = time(NULL) + ttl;
+    new_entry.ttl = ttl;
+    new_entry.expire_time = time(NULL) + ttl;
     if (ip4)
-        new_entry->ip4 = *ip4;
+        new_entry.ip4 = *ip4;
     else if (ip6)
-        new_entry->ip6 = *ip6;
-    list_add(&new_entry->list, cache);
-    cache->hash++; //容量加1
-    while (cache->hash > raw_config.cache_size)
-    {
-        //LRU删去尾节点
-        LOG(LOG_INFO, "Cache is FULL, deleting one entry\n");
-        trail_entry = cache->list.prev;
-        list_del(cache->list.prev);
-        free(trail_entry);
-        cache->hash--;
-    }
-    LOG(LOG_DBG, "Added cache entry: %u\n", name_hash);
+        new_entry.ip6 = *ip6;
+    lRUCachePut(cache, name_hash, new_entry);
 }
 
 //查询并提前该域名
 struct dns_cache *GetCacheEntry(uint32_t name_hash) {
-    struct list_head *pos = NULL, *n = NULL;
-    struct dns_cache *cur;
-    list_for_each_safe(pos, n, &cache->list) {
-        cur = pos;
-
-        if (cur->hash == name_hash) {
-            if (cur->expire_time > time(NULL)) {
-                //提前对应条目
-                list_del(pos);
-                list_add(pos,&cache->list);
-                return cur;
-            }
-            else {
-                LOG(LOG_DBG, "Deleted expired entry: %u\n", name_hash);
-                list_del(pos);
-                cache->hash--;
-                free(cur);
-                return NULL;
-            }
-        }
-        //删去过期条目
-        else if (cur->expire_time <= time(NULL)) {
-            LOG(LOG_DBG, "Deleted expired entry: %u\n", name_hash);
-            list_del(pos);
-            cache->hash--;
-            free(cur);
-        }
-    }
-
-    return NULL;
+    return lRUCacheGet(cache, name_hash);
 }
 
-void UpdateCacheEntry(struct dns_cache *entry, uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_t *ip6) {
-    if (entry && entry->hash == name_hash) {
-        entry->ttl = ttl;
-        entry->expire_time = time(NULL) + ttl;
-        if (ip4)
-            entry->ip4 = *ip4;
-        else if (ip6)
-            entry->ip6 = *ip6;
+/* 链表中添加一个节点(到链表头的位置) */
+void ListAdd(LRUCache *head, LRUCache *lt) {
+    lt->next = head->next;
+    lt->prev = head;
+    head->next->prev = lt;
+    head->next = lt;
+}
+
+/* 链表中删除一个节点 */
+void ListDel(LRUCache *lt) {
+    lt->prev->next = lt->next;
+    lt->next->prev = lt->prev;
+}
+
+LRUCache* lRUCacheCreate(int capacity) {    
+    // 链表头申请一个空间，用于后续的链表管理
+    LRUCache *listHead = (LRUCache*)malloc(sizeof(LRUCache));
+    listHead->capacity = capacity;
+    listHead->next = listHead;
+    listHead->prev = listHead;
+    return listHead;
+}
+
+static struct dns_cache *lRUCacheGet(LRUCache* obj, int key) {
+    LRUCache *s;
+    HASH_FIND_INT(uthash, &key, s);
+    if (s == NULL) {
+        return NULL;
+    } else {
+        // 从链表中删除，再加到链表头
+        ListDel(s);
+        ListAdd(obj, s);
+        return &(s->value);
     }
+}
+
+void lRUCachePut(LRUCache* obj, int key, struct dns_cache value) {
+    LRUCache *s = NULL;
+    HASH_FIND_INT(uthash, &key, s);
+    if (s != NULL) { // found
+        // 删除链表节点，并添加到链表头
+        ListDel(s);
+        ListAdd(obj, s);
+        s->value = value; // 修改value
+        return;
+    }
+    if (obj->capacity == HASH_COUNT(uthash)) {  // hash桶满的情况            
+            s = obj->prev; // s指向链表的尾部            
+            HASH_DEL(uthash, s); // 删除尾部元素在hash中的位置 
+            ListDel(s); // 链表中删除
+            free(s);
+    }    
+    s = (LRUCache *)malloc(sizeof(LRUCache));
+    s->key = key;
+    s->value = value;
+    HASH_ADD_INT(uthash, key, s);
+    ListAdd(obj, s);   //添加到链表头
+}
+
+void lRUCacheFree(LRUCache* obj) {
+    LRUCache *s, *tmp;
+    HASH_ITER(hh, uthash, s, tmp) {
+        HASH_DEL(uthash, s);
+        free(s);
+    }
+    free(obj);
+    uthash = NULL;
 }

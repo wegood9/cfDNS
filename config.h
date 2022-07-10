@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "cache.h"
+
 #define MAX_IP_CHAR 50
 #define MAX_SERVER_NUM_PER_TYPE 8
 #define MAX_CF_IP_RANGE 16
@@ -56,7 +58,7 @@ extern unsigned char debug_level;
 extern struct _raw_config raw_config;
 extern struct config loaded_config;
 extern struct trieNode *hosts_trie;
-extern struct dns_cache *cache;
+extern LRUCache *cache;
 
 
 static void preArgParse(int argc,char *argv[]);
