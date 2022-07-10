@@ -11,6 +11,7 @@
 struct _raw_config
 {
     char bind_ip[MAX_IP_CHAR + 1];
+    char bind_port[6];
     char UDP_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
     char TCP_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
     char DoT_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
@@ -18,7 +19,6 @@ struct _raw_config
     FILE *hosts;
     char cf_IPv4_range[MAX_CF_IP_RANGE][20];
     char cf_IPv6_range[MAX_CF_IP_RANGE][MAX_IP_CHAR + 1];
-    unsigned bind_port;
     unsigned char debug_level;
     unsigned char ttl_multiplier;
     unsigned int cache_size;
@@ -29,7 +29,6 @@ struct _raw_config
 
 struct config
 {
-    struct sockaddr_storage *listen;
     struct sockaddr_storage *udp_server[MAX_SERVER_NUM_PER_TYPE];
     struct sockaddr_storage *tcp_server[MAX_SERVER_NUM_PER_TYPE];
     struct cidr4 *cf_IPv4_range[MAX_CF_IP_RANGE];

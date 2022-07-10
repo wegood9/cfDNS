@@ -12,7 +12,6 @@
 #include "debug.h"
 #include "protocol.h"
 #include "config.h"
-#include "socket.h"
 
 #define MAX_AN_COUNT 50
 

@@ -5,6 +5,14 @@
 #include<netinet/in.h>
 #include<stdint.h>
 
+#include "hosts.h"
+#include "cache.h"
+#include "debug.h"
+#include "protocol.h"
+#include "config.h"
+#include "client.h"
+
+
 static struct dns_request *ParseDnsQuery(void *received_packet_buffer, int received_packet_length, int *q_count);
 void *BuildDnsResponsePacket(const char *domain_name, 
                              int *packet_size, 
@@ -13,7 +21,7 @@ void *BuildDnsResponsePacket(const char *domain_name,
                              const void *answer_in, 
                              const uint32_t ttl);
 void ProcessDnsQuery(const int client_fd, 
-                     const struct sockaddr *client_addr, 
+                     const struct sockaddr_storage *client_addr, 
                      void *received_packet_buffer, 
                      int received_packet_length);
 

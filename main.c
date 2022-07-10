@@ -4,17 +4,12 @@
 #include <string.h>
 #include <pthread.h>
 
-#include "debug.h"
 #include "server.h"
-#include "hosts.h"
-#include "config.h"
-#include "cache.h"
-#include "socket.h"
 
 struct param {
     int listenfd;  
     int n;
-    struct sockaddr *client_sockaddr;
+    struct sockaddr_storage *client_sockaddr;
     char *buffer;
 };
 
@@ -25,11 +20,9 @@ int main(int argc, char *argv[] ){
     ArgParse(argc,argv);
     int listenfd, n;
     char *buffer;
-    struct sockaddr *client_sockaddr;
+    struct sockaddr_storage *client_sockaddr;
     struct param *para;
-    int n_size = sizeof(struct sockaddr);
-
-
+    socklen_t n_size = sizeof(struct sockaddr_storage);
 
     hosts_trie = InitHosts(raw_config.hosts);
     if (!hosts_trie)
@@ -37,13 +30,7 @@ int main(int argc, char *argv[] ){
     else
         LOG(LOG_INFO, "hosts loaded\n");
 
-    if ((listenfd = socket((struct sockaddr_storage*)loaded_config.listen->ss_family, SOCK_DGRAM, 0)) != -1 && 
-        bind(listenfd, (struct sockaddr*)loaded_config.listen, sizeof(struct sockaddr)) != -1)
-        LOG(LOG_WARN, "Server is listening on UDP port %d at %s\n", raw_config.bind_port, raw_config.bind_ip);
-    else {
-        LOG(LOG_FATAL, "Failed to bind: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+    listenfd = MyBind(raw_config.bind_ip, raw_config.bind_port, SOCK_DGRAM);
 
     if (pthread_mutex_init(&cache_lock, NULL)) {
         LOG(LOG_FATAL, "Failed to create lock\n");
@@ -57,9 +44,9 @@ int main(int argc, char *argv[] ){
 
     while (1) {
         buffer = malloc(513 * sizeof(u_int8_t));
-        client_sockaddr = malloc(sizeof(struct sockaddr));
+        client_sockaddr = malloc(sizeof(struct sockaddr_storage));
         para = malloc(sizeof(struct param));
-
+    
         n = recvfrom(listenfd, buffer, 512, 0, client_sockaddr, &n_size);
         if (n == -1) {
             LOG(LOG_ERR, "Failed to receive request: %s\n", strerror(errno));
@@ -99,22 +86,23 @@ void *tcp_server_thread(void) {
     char buffer[4096];
     uint16_t n;
     int listenfd, connfd, sendfd;
-    int n_size = sizeof(struct sockaddr);
+    socklen_t n_size = sizeof(struct sockaddr_storage);
 
     int chosen_server;
 
-    if ((listenfd = socket((struct sockaddr_storage*)loaded_config.listen->ss_family, SOCK_STREAM, 0)) != -1 && 
-        bind(listenfd, (struct sockaddr*)loaded_config.listen, sizeof(struct sockaddr)) != -1 &&
-        listen(listenfd, 10) != -1)
-        LOG(LOG_WARN, "Server is listening on TCP port %d at %s\n", raw_config.bind_port, raw_config.bind_ip);
-    else {
-        LOG(LOG_FATAL, "Failed to bind TCP: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+    if (!loaded_config.tcp_num) {
+        LOG(LOG_ERR, "No TCP upstream server found\n");
+        LOG(LOG_ERR, "Ignore bind_tcp\n");
+        return NULL;
     }
+
+    listenfd = MyBind(raw_config.bind_ip, raw_config.bind_port, SOCK_STREAM);
+    listen(listenfd, 16);
+
     while (1) {
 
-        if( (connfd = accept(listenfd, (struct sockaddr*)NULL, NULL)) == -1){
-            LOG(LOG_ERR, "Accept socket error: %s(errno: %d)",strerror(errno),errno);
+        if( (connfd = accept(listenfd, (struct sockaddr_storage*)NULL, NULL)) == -1){
+            LOG(LOG_ERR, "Accept socket error: %s(errno: %d)\n",strerror(errno),errno);
             continue;
         }
         n = recv(connfd, buffer, 2, 0);
@@ -132,12 +120,11 @@ void *tcp_server_thread(void) {
         if ((sendfd = socket(loaded_config.tcp_server[chosen_server]->ss_family, SOCK_STREAM, 0)) < 0) {
             LOG(LOG_ERR, "Failed to create socket: %s\n", strerror(errno));
             close(sendfd);
-            close(connfd);
             continue;
         }
         if (connect_with_timeout(sendfd, 
-                                 (struct sockaddr*)loaded_config.tcp_server[chosen_server], 
-                                 sizeof(struct sockaddr), 
+                                 (struct sockaddr_storage*)loaded_config.tcp_server[chosen_server], 
+                                 sizeof(struct sockaddr_storage), 
                                  GLOBAL_TIMEOUT
                                 ) < 0) {
             LOG(LOG_ERR, "Failed to connect to TCP upstream: %s\n", strerror(errno));
@@ -156,4 +143,5 @@ void *tcp_server_thread(void) {
         close(sendfd);
         close(connfd);
     }
+    return NULL;
 }

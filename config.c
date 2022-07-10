@@ -9,7 +9,6 @@
 
 #include "debug.h"
 #include "config.h"
-#include "socket.h"
 #include "protocol.h"
 #include "cache.h"
 
@@ -21,79 +20,65 @@ struct dns_cache *cache = NULL;
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
-    struct sockaddr_storage *listen_addr = malloc(sizeof(struct sockaddr_storage));;
-
-    if (isValidIPv6(raw_config.bind_ip)){
-        memset(listen_addr, 0, sizeof(struct sockaddr_storage));
-        ((struct sockaddr_in6 *)listen_addr)->sin6_scope_id = GetScopeForIp(raw_config.bind_ip);
-        ((struct sockaddr_in6 *)listen_addr)->sin6_port = htons(raw_config.bind_port);
-        ((struct sockaddr_in6 *)listen_addr)->sin6_family = AF_INET6;
-        if (inet_pton(AF_INET6,raw_config.bind_ip,&(((struct sockaddr_in6 *)listen_addr)->sin6_addr.s6_addr)) <= 0){
-            LOG(LOG_FATAL, "Wrong binding address\n");
-            exit(errno);
-        }
-    }
-    else{
-        ((struct sockaddr_in *)listen_addr)->sin_port = htons(raw_config.bind_port);
-        ((struct sockaddr_in *)listen_addr)->sin_family = AF_INET;
-        void *sin_addr = &(((struct sockaddr_in *)listen_addr)->sin_addr);
-        if (inet_pton(AF_INET,raw_config.bind_ip,sin_addr) <= 0){
-            LOG(LOG_FATAL, "Wrong binding address\n");
-            exit(errno);
-        }
-    }
-    loaded_config.listen = listen_addr;
+    char *token_index;
 
     int i = 0,j = 0;
     for (i = 0,j = 0; raw_config.UDP_server[i][0] && i < MAX_SERVER_NUM_PER_TYPE; i++){
-        char *token_index = strtok(raw_config.UDP_server[i], ":");
+        //IPv4地址
         if (!loaded_config.udp_server[j])
             loaded_config.udp_server[j] = malloc(sizeof(struct sockaddr_storage));
-        
-        // 读入IPv6地址格式
-        if (token_index[strlen(token_index) - 1] == ']') {
-            //去掉头尾的中括号
-            token_index[strlen(token_index) - 1] = 0;
-            token_index++;
-            if(inet_pton(AF_INET6, token_index, &(((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_addr) ) <= 0)
-                continue;
-            ((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_port = htons(atoi(strtok(NULL, ":")));
-            ((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_family = AF_INET6;
-        }
-        else {
-            //读入IPv4地址格式
+        if (raw_config.UDP_server[i][0] != '[') {
+            token_index = strtok(raw_config.UDP_server[i], ":");
             if(inet_pton(AF_INET, token_index, &(((struct sockaddr_in *)loaded_config.udp_server[j])->sin_addr) ) <= 0)
                 continue;
             ((struct sockaddr_in *)loaded_config.udp_server[j])->sin_port = htons(atoi(strtok(NULL, ":")));
             ((struct sockaddr_in *)loaded_config.udp_server[j])->sin_family = AF_INET;
+            j++;
         }
-        j++;
+        //IPv6地址
+        else {
+            token_index = strtok(raw_config.UDP_server[i], "]");
+            //去掉头部的'['
+            token_index[0] = 0;
+            token_index++;
+            if(inet_pton(AF_INET6, token_index, &(((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_addr) ) <= 0)
+                continue;
+            token_index = strtok(NULL, "]");
+            token_index++; //去掉:
+            ((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_port = htons(atoi(token_index));
+            ((struct sockaddr_in6 *)loaded_config.udp_server[j])->sin6_family = AF_INET6;
+            j++;
+        }
     }
     loaded_config.udp_num = j;
 
     for (i = 0,j = 0; raw_config.TCP_server[i][0] && i < MAX_SERVER_NUM_PER_TYPE; i++){
-        char *token_index = strtok(raw_config.TCP_server[i], ":");
         if (!loaded_config.tcp_server[j])
             loaded_config.tcp_server[j] = malloc(sizeof(struct sockaddr_storage));
-        
-        // 读入IPv6地址格式
-        if (token_index[strlen(token_index) - 1] == ']') {
-            //去掉头尾的中括号
-            token_index[strlen(token_index) - 1] = 0;
-            token_index++;
-            if(inet_pton(AF_INET6, token_index, &(((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_addr) ) <= 0)
-                continue;
-            ((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_port = htons(atoi(strtok(NULL, ":")));
-            ((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_family = AF_INET6;
-        }
-        else {
-            //读入IPv4地址格式
+
+        //IPv4地址
+        if (raw_config.TCP_server[i][0] != '[') {
+            token_index = strtok(raw_config.TCP_server[i], ":");
             if(inet_pton(AF_INET, token_index, &(((struct sockaddr_in *)loaded_config.tcp_server[j])->sin_addr) ) <= 0)
                 continue;
             ((struct sockaddr_in *)loaded_config.tcp_server[j])->sin_port = htons(atoi(strtok(NULL, ":")));
             ((struct sockaddr_in *)loaded_config.tcp_server[j])->sin_family = AF_INET;
+            j++;
         }
-        j++;
+        //IPv6地址
+        else {
+            token_index = strtok(raw_config.TCP_server[i], "]");
+            //去掉头部的'['
+            token_index[0] = 0;
+            token_index++;
+            if(inet_pton(AF_INET6, token_index, &(((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_addr) ) <= 0)
+                continue;
+            token_index = strtok(NULL, "]");
+            token_index++; //去掉:
+            ((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_port = htons(atoi(token_index));
+            ((struct sockaddr_in6 *)loaded_config.tcp_server[j])->sin6_family = AF_INET6;
+            j++;
+        }
     }
     loaded_config.tcp_num = j;
 
@@ -125,7 +110,7 @@ void ArgParse(int argc,char *argv[]){
         }
 
         for (i = 0, j = 0; raw_config.cf_IPv4_range[i][0] && i < MAX_CF_IP_RANGE; i++) {
-            char *token_index = strtok(raw_config.cf_IPv4_range[i], "/");
+            token_index = strtok(raw_config.cf_IPv4_range[i], "/");
             if (!loaded_config.cf_IPv4_range[j])
                 loaded_config.cf_IPv4_range[j] = malloc(sizeof(struct sockaddr_storage));
             if(inet_pton(AF_INET, token_index, &(loaded_config.cf_IPv4_range[j]->ip4)) <= 0)
@@ -136,7 +121,7 @@ void ArgParse(int argc,char *argv[]){
         loaded_config.cf4_num = j;
 
         for (i = 0, j = 0; raw_config.cf_IPv6_range[i][0] && i < MAX_CF_IP_RANGE; i++) {
-            char *token_index = strtok(raw_config.cf_IPv6_range[i], "/");
+            token_index = strtok(raw_config.cf_IPv6_range[i], "/");
             if (!loaded_config.cf_IPv6_range[j])
                 loaded_config.cf_IPv6_range[j] = malloc(sizeof(struct sockaddr_storage));
             if(inet_pton(AF_INET6, token_index, &(loaded_config.cf_IPv6_range[j]->ip6)) <= 0)
@@ -170,7 +155,7 @@ void preArgParse(int argc,char *argv[]){
     char tmp[512];
     
     strncpy(raw_config.bind_ip, ReadLine(fp, "bind_ip", tmp), MAX_IP_CHAR);
-    raw_config.bind_port = atoi(ReadLine(fp, "bind_port", tmp));
+    strncpy(raw_config.bind_port, ReadLine(fp, "bind_port", tmp), 6);
     raw_config.hosts = fopen(ReadLine(fp, "hosts_file", tmp), "r");
     raw_config.enable_AAAA = ReadLine(fp, "enable_AAAA", tmp)[0] - 48;
     raw_config.enable_mem_cache = ReadLine(fp, "enable_mem_cache", tmp)[0] - 48;

@@ -9,9 +9,12 @@
 #include <net/if.h> 
 #include <ifaddrs.h>
 #include <netdb.h>
+#include <sys/types.h>
+
 
 #include "socket.h"
 #include "config.h"
+#include "debug.h"
 
 bool isIPv6(char *ip_addr){
     if (ip_addr[0] == '[' || (!strrchr(ip_addr, ':') && strrchr(ip_addr, ':') != !strchr(ip_addr, ':')) )
@@ -99,4 +102,54 @@ unsigned GetScopeForIp(const char *ip){
     }
     freeifaddrs(addrs);
     return scope;
+}
+
+int MyBind(const char *ip, const char *port, int type) {
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    int s, listenfd;
+    int reuse = 1;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = type;
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    s = getaddrinfo(ip, port, &hints, &result);
+    if (s != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        exit(EXIT_FAILURE);
+    }
+
+
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        listenfd = socket(rp->ai_family, rp->ai_socktype,
+                       rp->ai_protocol);
+        if (listenfd == -1)
+            continue;
+
+        if (type == SOCK_STREAM)
+            setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+            
+        if (bind(listenfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;
+
+        close(listenfd);
+    }
+    freeaddrinfo(result);
+
+    if (rp == NULL) {
+        LOG(LOG_FATAL, "Failed to bind: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    else
+        LOG(LOG_WARN, "Server is listening on %s port %s at %s\n", 
+                type == SOCK_DGRAM ? "UDP" : "TCP", raw_config.bind_port, raw_config.bind_ip);
+
+    return listenfd;
 }

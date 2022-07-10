@@ -7,13 +7,8 @@
 #include<stdint.h>
 
 #include "server.h"
-#include "hosts.h"
-#include "cache.h"
-#include "debug.h"
-#include "protocol.h"
-#include "config.h"
-#include "client.h"
-#include "socket.h"
+
+
 
 static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,0x2d,
                             0x73,0x65,0x72,0x76,0x65,0x72,0x73,0x03,0x6e,0x65,
@@ -23,7 +18,7 @@ static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,
                             0x00,0x00,0x07,0x08,0x00,0x00,0x03,0x84,0x00,0x09,
                             0x3a,0x80,0x00,0x01,0x51,0x80};
 
-void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , void *received_packet_buffer, int received_packet_length){
+void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_addr , void *received_packet_buffer, int received_packet_length){
     struct dns_request *query = NULL;
     struct dns_cache *cache_entry = NULL;
     struct dns_response *cache_response = NULL;
@@ -31,7 +26,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr *client_addr , v
     char *upstream_answer = NULL, *buffer = NULL;
     int q_count, packet_length, an_count;
     uint16_t cache_req_id;
-    int n_size = sizeof(struct sockaddr);
+    int n_size = sizeof(struct sockaddr_storage);
     uint32_t name_hash, cache_ttl;
     int time_watch = time(NULL);
 
