@@ -30,6 +30,9 @@ int main(int argc, char *argv[] ){
     else
         LOG(LOG_INFO, "hosts loaded\n");
 
+    if (loaded_config.doh_num)
+        LOG(LOG_INFO, "DoH settings detected! Put DoH upstream first\n");
+
     listenfd = MyBind(raw_config.bind_ip, raw_config.bind_port, SOCK_DGRAM);
 
     if (pthread_mutex_init(&cache_lock, NULL)) {

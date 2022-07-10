@@ -14,8 +14,8 @@ struct _raw_config
     char bind_port[6];
     char UDP_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
     char TCP_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
-    char DoT_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
-    char DoH_server[MAX_SERVER_NUM_PER_TYPE][MAX_IP_CHAR + 1];
+    char DoT_server[MAX_SERVER_NUM_PER_TYPE][100];
+    char DoH_server[MAX_SERVER_NUM_PER_TYPE][100];
     FILE *hosts;
     char cf_IPv4_range[MAX_CF_IP_RANGE][20];
     char cf_IPv6_range[MAX_CF_IP_RANGE][MAX_IP_CHAR + 1];

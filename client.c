@@ -277,7 +277,7 @@ struct dns_response *ParseDnsResponse(void *packet_buffer,
 
         switch (responses[i].response_type) {
         case DNS_A_RECORD:
-            responses[i].ip_addr = ntohl(*(uint32_t *)buffer_index);
+            responses[i].ip_addr = *(uint32_t *)buffer_index;
             break;
 
         case DNS_AAAA_RECORD:

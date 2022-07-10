@@ -83,7 +83,7 @@ void ArgParse(int argc,char *argv[]){
     loaded_config.tcp_num = j;
 
     i = 0;
-    while(raw_config.DoH_server[i][0])
+    while(raw_config.DoH_server[i][0] == 'h')
         i++;
     loaded_config.doh_num = i;
     i = 0;
@@ -187,8 +187,8 @@ void preArgParse(int argc,char *argv[]){
     for (unsigned char i = 0; token_index && i < MAX_SERVER_NUM_PER_TYPE; i++){
         if (i < MAX_SERVER_NUM_PER_TYPE - 1)
             raw_config.DoH_server[i+1][0] = 0; //may be removed
-        if (strlen(token_index) > 6)
-            strncpy(raw_config.DoH_server[i], token_index, 41);
+        if (strlen(token_index) > 10)
+            strncpy(raw_config.DoH_server[i], token_index, 99);
         token_index=strtok(NULL, "\", ");
     }
 
@@ -234,6 +234,9 @@ char *ReadLine(FILE *fp, char str[], char *readin){
         if (!strncmp(readin, str, strlen(str))){
             if (readin[strlen(readin) - 1] == '\n')
                 readin[strlen(readin) - 1] = 0; //去掉换行
+            
+            if (strlen(readin) == strlen(str))
+                return readin;
 
             for (int i = 0; i < strlen(readin); i++)
                 if (readin[i] == ' ')

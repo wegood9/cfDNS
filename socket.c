@@ -148,7 +148,7 @@ int MyBind(const char *ip, const char *port, int type) {
         exit(EXIT_FAILURE);
     }
     else
-        LOG(LOG_WARN, "Server is listening on %s port %s at %s\n", 
+        printf("INFO: Server is listening on %s port %s at %s\n", 
                 type == SOCK_DGRAM ? "UDP" : "TCP", raw_config.bind_port, raw_config.bind_ip);
 
     return listenfd;

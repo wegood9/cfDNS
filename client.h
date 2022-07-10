@@ -1,3 +1,4 @@
+#include "doh.h"
 extern struct dns_response *ParseDnsResponse(void *packet_buffer, 
 							int packet_length, 
 							int expected_id, 

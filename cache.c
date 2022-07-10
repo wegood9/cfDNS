@@ -34,6 +34,7 @@ void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_
         free(trail_entry);
         cache->hash--;
     }
+    LOG(LOG_DBG, "Added cache entry: %u\n", name_hash);
 }
 
 //查询并提前该域名

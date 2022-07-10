@@ -118,6 +118,7 @@ struct trieNode *InitHosts(FILE *hosts) {
 
 void InsertHosts(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
     InsertTrie(root, domain_name, ip4, ip6);
+    LOG(LOG_INFO, "Add %s to memory hosts\n", domain_name);
 }
 
 struct trieNode * inHosts(struct trieNode *root, char *domain_name) {
