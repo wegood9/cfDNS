@@ -48,6 +48,10 @@ char *QueryDoH(const char *domain_name,
     switch (status) {
         case 0:
             token = strstr(token, "\"Answer\"");
+            if (!token) {
+                LOG(LOG_WARN, "DoH query failed\n");
+                break;
+            }
             token = strstr(token, request_q_type == DNS_A_RECORD ? "\"type\":1," : "\"type\":28,");
             if (!token) {
                 LOG(LOG_WARN, "DoH query failed\n");
