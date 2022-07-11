@@ -3,8 +3,13 @@ Yet another DNS server, working with selected Cloudflare edge IPs
 
 ## Compile
 
-'make clean & make'
+Under Linux, Unix, Cygwin
+```
+make clean & make
+```
 
 ## Usage
 
-'./cfDNS [path to config file]'
+```
+./cfDNS [path to config file]
+```
