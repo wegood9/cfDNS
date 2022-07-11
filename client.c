@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <limits.h>
+#include <unistd.h>
 
 
 #include "debug.h"
@@ -435,6 +436,7 @@ char *SendDnsRequest(char *query, int length, int *recv_length) {
             return buffer;
         }
     }
+    return NULL;
 }
 
 struct dns_response *GetRecordPointerFromResponse(struct dns_response *response, int answer_count, int type) {

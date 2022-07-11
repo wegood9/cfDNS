@@ -21,6 +21,11 @@ static const char SOA_trail[66] = {0x00,0x40,0x01,0x61,0x0c,0x67,0x74,0x6c,0x64,
                             0x00,0x00,0x07,0x08,0x00,0x00,0x03,0x84,0x00,0x09,
                             0x3a,0x80,0x00,0x01,0x51,0x80};
 
+static struct dns_request *ParseDnsQuery(void *received_packet_buffer, int received_packet_length, int *q_count);
+static void ModifyID(void *buffer, uint16_t id);
+static bool MatchIPv4Cf(uint32_t *ip);
+static bool MatchIPv6Cf(struct in6_addr *ip6);
+
 void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_addr , void *received_packet_buffer, int received_packet_length){
     struct dns_request *query = NULL;
     struct dns_cache *cache_entry = NULL;
@@ -385,7 +390,7 @@ void ProcessDnsQuery(const int client_fd, const struct sockaddr_storage *client_
     free(query);
 }
 
-struct dns_request *ParseDnsQuery(void *packet_buffer, int packet_length, int *q_count) {
+static struct dns_request *ParseDnsQuery(void *packet_buffer, int packet_length, int *q_count) {
 
     int bytes_read;
     char *buffer_index, *packet_end;

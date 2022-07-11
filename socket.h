@@ -4,6 +4,5 @@
 
 #define GLOBAL_TIMEOUT 3000
 
-extern bool isIPv6(char *ip_addr);
 extern int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addrlen, unsigned int timeout_ms);
 extern int MyBind(const char *ip, const char *port, int type);

@@ -39,7 +39,3 @@ struct list_head
 extern LRUCache *InitCache();
 extern void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_t *ip6);
 extern struct dns_cache *GetCacheEntry(uint32_t name_hash);
-
-static LRUCache* lRUCacheCreate(int capacity);
-static struct dns_cache *lRUCacheGet(LRUCache* obj, int key);
-static void lRUCachePut(LRUCache* obj, int key, struct dns_cache value);

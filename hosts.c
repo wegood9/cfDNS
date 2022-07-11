@@ -3,13 +3,20 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "hosts.h"
 #include "debug.h"
 #include "config.h"
+#include "protocol.h"
+
+static int GetIndex(char c);
+static struct trieNode *NewTrieNode(void);
+static void InsertTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6);
+static void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6);
 
 //只考虑传统域名
-int GetIndex(char c) {
+static int GetIndex(char c) {
     if (c == '.')
         return 36;
         //第36号为.
@@ -24,7 +31,7 @@ int GetIndex(char c) {
         //不区分大小写
 }
 
-struct trieNode *NewTrieNode(void) {
+static struct trieNode *NewTrieNode(void) {
     struct trieNode *newNode = malloc(sizeof(struct trieNode));
     if (!newNode) {
         LOG(LOG_FATAL, "Failed to allocate memory for hosts\n");
@@ -35,12 +42,13 @@ struct trieNode *NewTrieNode(void) {
     return newNode;
 }
 
-void InsertTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
+static void InsertTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
     int len = strlen(domain_name), index;
     struct trieNode *p = root;
 
     for (int level = 0; level<len; level++)
     {
+        
         index = GetIndex(domain_name[level]);
   
         //新节点
@@ -49,16 +57,15 @@ void InsertTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint1
   
         p = p->child[index];
     }
-
     //叶子节点
     p->isLeaf = true;
     if (ip4)
         p->ip4 = *ip4;
     if (ip6)
-        p->ip6 = *ip6;
+        memcpy(&p->ip6, ip6, sizeof(__uint128_t));
 }
 
-void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
+static void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6) {
     struct trieNode *p = root;
     int len = strlen(domain_name), index;
 
@@ -74,7 +81,7 @@ void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint
         if (ip4)
             *ip4 = p->ip4;
         else if (ip6)
-            *ip6 = p->ip6;
+            memcpy(ip6, &p->ip6, sizeof(__uint128_t));
         return p;
     }
   
@@ -99,6 +106,7 @@ struct trieNode *InitHosts(FILE *hosts) {
             readin[strlen(readin) - 1] = 0; //去掉换行符
 
         token = strtok(readin, " ");
+
         if (isValidIPv6(token)) {
             inet_pton(AF_INET6, token, &addr6.sin6_addr);
             token = strtok(NULL, " ");

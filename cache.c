@@ -6,6 +6,10 @@ pthread_mutex_t cache_lock;
 
 LRUCache *uthash = NULL;
 
+static LRUCache* lRUCacheCreate(int capacity);
+static struct dns_cache *lRUCacheGet(LRUCache* obj, int key);
+static void lRUCachePut(LRUCache* obj, int key, struct dns_cache value);
+
 LRUCache *InitCache() {
     return lRUCacheCreate(raw_config.cache_size);
 }
@@ -48,7 +52,7 @@ void ListDel(LRUCache *lt) {
     lt->next->prev = lt->prev;
 }
 
-LRUCache* lRUCacheCreate(int capacity) {    
+static LRUCache* lRUCacheCreate(int capacity) {    
     // 链表头申请一个空间，用于后续的链表管理
     LRUCache *listHead = (LRUCache*)malloc(sizeof(LRUCache));
     listHead->capacity = capacity;
@@ -70,7 +74,7 @@ static struct dns_cache *lRUCacheGet(LRUCache* obj, int key) {
     }
 }
 
-void lRUCachePut(LRUCache* obj, int key, struct dns_cache value) {
+static void lRUCachePut(LRUCache* obj, int key, struct dns_cache value) {
     LRUCache *s = NULL;
     HASH_FIND_INT(uthash, &key, s);
     if (s != NULL) { // found

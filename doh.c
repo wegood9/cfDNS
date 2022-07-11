@@ -2,8 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-#include <poll.h>
-
 
 #include "server.h"
 #include "config.h"
@@ -20,16 +18,12 @@ char *QueryDoH(const char *domain_name,
     char buffer[512];
     char *token, *answer = NULL;
     void *tmp;
-    int len, chosen = rand() % loaded_config.doh_num;
+    int chosen = rand() % loaded_config.doh_num;
     char query[256] = "curl -s ";
     uint32_t ttl = 0;
     uint32_t answer_ip4;
     __uint128_t answer_ip6;
 
-    struct pollfd fd;
-    int res;
-
-    fd.events = POLLIN;
 
     sprintf(query, "curl -m 3 -s \"%s?name=%s&type=%s\"", raw_config.DoH_server[chosen], domain_name, request_q_type == DNS_A_RECORD ? "A" : "AAAA");
     fp=popen(query,"r");

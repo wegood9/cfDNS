@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "server.h"
 #include "debug.h"
@@ -30,12 +31,12 @@ int main(int argc, char *argv[] ){
 
     hosts_trie = InitHosts(raw_config.hosts);
     if (!hosts_trie)
-        LOG(LOG_WARN, "Failed to load hosts: %s\n", strerror(errno));
+        LOG(LOG_ERR, "Failed to load hosts: %s\n", strerror(errno));
     else
         LOG(LOG_INFO, "hosts loaded\n");
 
     if (loaded_config.doh_num)
-        LOG(LOG_INFO, "DoH settings detected! Put DoH upstream first\n");
+        LOG(LOG_WARN, "DoH settings detected! Put DoH upstream first\n");
 
     listenfd = MyBind(raw_config.bind_ip, raw_config.bind_port, SOCK_DGRAM);
 
@@ -93,7 +94,6 @@ void *tcp_server_thread(void) {
     char buffer[4096];
     uint16_t n;
     int listenfd, connfd, sendfd;
-    socklen_t n_size = sizeof(struct sockaddr_storage);
 
     int chosen_server;
 

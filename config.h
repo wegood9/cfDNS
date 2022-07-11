@@ -60,7 +60,4 @@ extern struct config loaded_config;
 extern struct trieNode *hosts_trie;
 extern LRUCache *cache;
 
-
-static void preArgParse(int argc,char *argv[]);
-static char *ReadLine(FILE *fp, char str[], char *readin);
 extern void ArgParse(int argc,char *argv[]);

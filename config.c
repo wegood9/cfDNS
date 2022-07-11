@@ -6,6 +6,7 @@
 #include<stdio.h>
 #include<errno.h>
 #include<string.h>
+#include<unistd.h>
 
 #include "debug.h"
 #include "config.h"
@@ -16,6 +17,9 @@ struct config loaded_config;
 unsigned char debug_level = 0;
 struct trieNode *hosts_trie = NULL;
 LRUCache* cache = NULL;
+
+static void preArgParse(int argc,char *argv[]);
+static char *ReadLine(FILE *fp, char str[], char *readin);
 
 void ArgParse(int argc,char *argv[]){
     preArgParse(argc,argv);
@@ -133,7 +137,7 @@ void ArgParse(int argc,char *argv[]){
 
 }
 
-void preArgParse(int argc,char *argv[]){
+static void preArgParse(int argc,char *argv[]){
 
     FILE *fp = NULL;
     if (argc == 1) {
@@ -225,7 +229,7 @@ void preArgParse(int argc,char *argv[]){
     close(fp);
 }
 
-char *ReadLine(FILE *fp, char str[], char *readin){
+static char *ReadLine(FILE *fp, char str[], char *readin){
     rewind(fp);
     while(fgets(readin, 511, fp)){
         if (readin[0] == '#' || readin[0] == '\n')

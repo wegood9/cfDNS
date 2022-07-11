@@ -12,11 +12,6 @@ struct trieNode
     struct trieNode *child[CHARS];
 };
 
-static int GetIndex(char c);
-static struct trieNode *NewTrieNode(void);
-extern void InsertTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6);
-static void *LookupTrie(struct trieNode *root, char *domain_name, uint32_t *ip4, __uint128_t *ip6);
-
 extern struct trieNode * inHosts(struct trieNode *root, char *domain_name);
 extern void *GetHostsEntry(struct trieNode *p, char type);
 extern struct trieNode *InitHosts(FILE *hosts);

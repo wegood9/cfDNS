@@ -9,6 +9,7 @@
 #include <net/if.h> 
 #include <ifaddrs.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <sys/types.h>
 
 
@@ -16,12 +17,6 @@
 #include "config.h"
 #include "debug.h"
 
-bool isIPv6(char *ip_addr){
-    if (ip_addr[0] == '[' || (!strrchr(ip_addr, ':') && strrchr(ip_addr, ':') != !strchr(ip_addr, ':')) )
-        return true;
-    else
-        return false;
-}
 
 int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addrlen, unsigned int timeout_ms) {
     int rc = 0;
