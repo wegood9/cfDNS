@@ -24,7 +24,14 @@ void AddEntryToCache(uint32_t name_hash, uint32_t ttl, uint32_t *ip4, __uint128_
 
 //查询并提前该域名
 struct dns_cache *GetCacheEntry(uint32_t name_hash) {
-    return lRUCacheGet(cache, name_hash);
+    struct dns_cache* tmp = lRUCacheGet(cache, name_hash);
+    if (!tmp)
+        LOG(LOG_DBG, "Cache missed: %d\n", name_hash);
+    else if (tmp->expire_time < time(NULL))
+        LOG(LOG_DBG, "Cache expired: %d\n", name_hash);
+    else
+        return tmp;
+    return NULL;
 }
 
 /* 链表中添加一个节点(到链表头的位置) */

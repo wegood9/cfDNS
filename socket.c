@@ -77,32 +77,6 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
     return rc;
 }
 
-unsigned GetScopeForIp(const char *ip){
-    struct ifaddrs *addrs;
-    char ipAddress[NI_MAXHOST];
-    unsigned scope=0;
-    // walk over the list of all interface addresses
-    getifaddrs(&addrs);
-    for(struct ifaddrs *addr=addrs;addr;addr=addr->ifa_next){
-        if (addr->ifa_addr && addr->ifa_addr->sa_family==AF_INET6){ // only interested in ipv6 ones
-            getnameinfo(addr->ifa_addr,sizeof(struct sockaddr_in6),ipAddress,sizeof(ipAddress),NULL,0,NI_NUMERICHOST);
-            // result actually contains the interface name, so strip it
-            for(int i=0;ipAddress[i];i++){
-                if(ipAddress[i]=='%'){
-                    ipAddress[i]='\0';
-                    break;
-                }
-            }
-            // if the ip matches, convert the interface name to a scope index
-            if(strcmp(ipAddress,ip)==0){
-                scope=if_nametoindex(addr->ifa_name);
-                break;
-            }
-        }
-    }
-    freeifaddrs(addrs);
-    return scope;
-}
 
 int MyBind(const char *ip, const char *port, int type) {
     struct addrinfo hints;

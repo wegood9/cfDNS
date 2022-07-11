@@ -137,7 +137,7 @@ void preArgParse(int argc,char *argv[]){
 
     FILE *fp = NULL;
     if (argc == 1) {
-        LOG(LOG_INFO, "Reading config from default config.txt\n");
+        LOG(LOG_WARN, "Reading config from default config.txt\n");
         fp = fopen("config.txt", "r");
     }
     else{
